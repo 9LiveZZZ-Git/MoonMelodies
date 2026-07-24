@@ -1581,6 +1581,7 @@ class FigLblStruct:
         self.metaStr = 'Created with PlanetProfile'
         self.meta = {}  # Note: only certain keys work with specific combinations of output file format and backend. See https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html
         # Label display toggles
+        self.STRIP_LATEX = False  # Set True (by StripLatex, when no LaTeX is installed) so dynamic label builders also convert siunitx/mhchem markup to mathtext on the fly.
         self.NEGATIVE_UNIT_POWERS = True  # Whether to use negative powers for units in latex tables, or instead a backslash.
         self.NAN_FOR_EMPTY = False  # Whether to use nan (or -) for empty layer parameters that were not calculated or not present.
         self.PFULL_IN_GPa = True  # Whether to print P in GPa (or MPa) for full-body plots
@@ -2324,12 +2325,18 @@ class FigLblStruct:
         # Set a tag to append to titles in the event all of what we're plotting
         # has a single composition, for additional clarity.
         self.compEnd = f', \ce{{{comp}}} ocean'
+        if self.STRIP_LATEX:
+            self.compEnd = self.StripLatexFromString(self.compEnd)
 
     def SetInduction(self, bodyname, IndParams, Texc_h):
         # Set titles, labels, and axis settings pertaining to inductogram plots
         self.phaseSpaceTitle = f'\\textbf{{{bodyname} interior phase space}}'
         self.inductionTitle = f'\\textbf{{{bodyname} induction response{self.compEnd}}}'
         self.inductCompareTitle = f'\\textbf{{{bodyname} induction response on different axes{self.compEnd}}}'
+        if self.STRIP_LATEX:
+            self.phaseSpaceTitle = self.StripLatexFromString(self.phaseSpaceTitle)
+            self.inductionTitle = self.StripLatexFromString(self.inductionTitle)
+            self.inductCompareTitle = self.StripLatexFromString(self.inductCompareTitle)
 
         self.sigLims = [10**IndParams.sigmaMin[bodyname], 10**IndParams.sigmaMax[bodyname]]
         self.Dlims = [10**IndParams.Dmin[bodyname], 10**IndParams.Dmax[bodyname]]
@@ -2492,13 +2499,29 @@ class FigLblStruct:
 
 
     def StripLatexFromString(self, str2strip):
-        str2strip = str2strip.replace('\si{', '\mathrm{')
-        str2strip = str2strip.replace('\SI{', '{')
-        str2strip = str2strip.replace('\ce{', '{')
-        str2strip = str2strip.replace(r'\textbf{', '{')
-        return str2strip
+        """ Convert LaTeX-package markup that matplotlib's built-in mathtext cannot parse
+            (siunitx \\si/\\SI/\\num, mhchem \\ce, \\textbf, and the ~ non-breaking space)
+            into mathtext-compatible equivalents, so labels render on the fly via mathtext
+            with no LaTeX/siunitx/mhchem installation required. """
+        import re
+        s = str2strip
+        # Match a brace-group argument that may contain one level of nested braces, e.g.
+        # \si{m\,s^{-2}}. Using [^}]* (exclude only '}') captures up to the first '}' and
+        # relies on brace-balancing so a trailing '}' from the outer group is preserved.
+        # siunitx: \SI{value}{unit} -> value + thin-space + upright unit; \si{unit} -> upright; \num{x} -> x
+        s = re.sub(r'\\SI\{([^}]*)\}\{([^}]*)\}', lambda m: m.group(1) + r'\,\mathrm{' + m.group(2) + '}', s)
+        s = re.sub(r'\\si\{([^}]*)\}', lambda m: r'\mathrm{' + m.group(1) + '}', s)
+        s = re.sub(r'\\num\{([^}]*)\}', r'\1', s)
+        # mhchem: \ce{formula} -> upright text (subscripting is dropped; acceptable fallback)
+        s = re.sub(r'\\ce\{([^}]*)\}', lambda m: r'\mathrm{' + m.group(1) + '}', s)
+        # \textbf{...} -> plain content (safe whether or not the string is in math mode)
+        s = re.sub(r'\\textbf\{([^}]*)\}', r'\1', s)
+        # ~ is a LaTeX non-breaking space; mathtext has no equivalent, use a normal space
+        s = s.replace('~', ' ')
+        return s
 
     def StripLatex(self):
+        self.STRIP_LATEX = True  # let dynamic label builders know to convert on the fly too
         for key, val in self.__dict__.items():
             if type(val) == str:
                 self.__setattr__(key, self.StripLatexFromString(val))

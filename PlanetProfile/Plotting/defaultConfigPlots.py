@@ -524,7 +524,27 @@ def plotAssign():
     FigMisc.SetLatex()
     FigMisc.SetLatLon()
     if not FigMisc.TEX_INSTALLED:
+        # No LaTeX available: render every label via matplotlib's built-in mathtext.
+        # 1) Convert the static labels up front.
         FigLbl.StripLatex()
+        # 2) Labels are also assembled dynamically at plot time (composition/salinity
+        #    titles, wedge/induction/exploration titles, axis and colorbar/tick labels).
+        #    Every piece of matplotlib text passes through Text.set_text, so sanitize
+        #    there once -- converting siunitx/mhchem/\textbf markup to mathtext on the fly
+        #    wherever it appears. Scoped to the no-LaTeX case, so LaTeX installs are
+        #    unaffected.
+        import matplotlib.text as _mplText
+        _sanitize = FigLbl.StripLatexFromString
+        if not getattr(_mplText.Text.set_text, '_ppMathtextWrapped', False):
+            _origSetText = _mplText.Text.set_text
+
+            def _sanitizedSetText(self, s):
+                if isinstance(s, str):
+                    s = _sanitize(s)
+                return _origSetText(self, s)
+
+            _sanitizedSetText._ppMathtextWrapped = True
+            _mplText.Text.set_text = _sanitizedSetText
 
     # Table printout settings
     FigMisc.PRINT_BULK = True  # Whether to print bulk body properties, like mass and MoI
