@@ -2516,6 +2516,22 @@ class FigLblStruct:
         s = re.sub(r'\\ce\{([^}]*)\}', lambda m: r'\mathrm{' + m.group(1) + '}', s)
         # \textbf{...} -> plain content (safe whether or not the string is in math mode)
         s = re.sub(r'\\textbf\{([^}]*)\}', r'\1', s)
+        # siunitx unit macros (e.g. \si{\kilo\meter}) that mathtext cannot parse ->
+        # plain symbols. Longer prefixes/units first; \b prevents partial matches.
+        _units = [
+            (r'\\kilogram', 'kg'), (r'\\metre', 'm'), (r'\\meter', 'm'), (r'\\gram', 'g'),
+            (r'\\second', 's'), (r'\\minute', 'min'), (r'\\hour', 'h'), (r'\\kelvin', 'K'),
+            (r'\\pascal', 'Pa'), (r'\\watt', 'W'), (r'\\joule', 'J'), (r'\\newton', 'N'),
+            (r'\\ampere', 'A'), (r'\\volt', 'V'), (r'\\tesla', 'T'), (r'\\percent', r'\%'),
+            (r'\\degree', '°'), (r'\\squared', '^{2}'), (r'\\cubed', '^{3}'), (r'\\per', '/'),
+            (r'\\kilo', 'k'), (r'\\mega', 'M'), (r'\\giga', 'G'), (r'\\milli', 'm'),
+            (r'\\micro', r'\mu '), (r'\\nano', 'n'), (r'\\centi', 'c'),
+        ]
+        # No word-boundary anchor: prefix+unit combos (e.g. \kilo\meter) leave the prefix
+        # adjacent to a converted letter. Longest macros are listed first so multi-word
+        # units (\kilogram) convert before their prefixes (\kilo).
+        for macro, rep in _units:
+            s = re.sub(macro, lambda m, _r=rep: _r, s)   # literal replacement (rep may contain backslashes)
         # ~ is a LaTeX non-breaking space; mathtext has no equivalent, use a normal space
         s = s.replace('~', ' ')
         return s
