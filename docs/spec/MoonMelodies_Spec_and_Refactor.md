@@ -15,6 +15,26 @@ Outputs are matplotlib figures plus data files (`.txt` profiles, `.pkl` pickles,
 
 This is stated as fact, not criticism — and it is an **advantage**. The UI effort is genuinely greenfield. We are not unwinding a Streamlit app or reconciling a legacy frontend; we get to design the API boundary and the browser experience cleanly, on top of an engine we deliberately leave in place.
 
+## Implementation Update — 2026-07-24
+
+This section logs work completed against the plan below, and one correction to the Reality Check.
+
+**Correction — the current UI *is* a Streamlit app.** The Reality Check above is right that *this repository* contains no web layer, but the current production UI does exist: it is a Streamlit multi-page app hosted on the Hugging Face Space `vsteven/planetprofile` (entry `PlanetProfileApp/PlanetProfileApp.py`, pages under `PlanetProfileApp/pages/`). It bundles its own copy of PlanetProfile. So the greenfield framing still holds for *our* frontend/backend, but there is a reference UI to reach parity with — its plot-producing pages are `PlanetProfileOutputs`, `Exploreogram`, `CompareRuns`, and `Inference` (Bayesian).
+
+**Done and committed on `repo-cleanup`:**
+
+- **Phase 0 (Stabilize)** — the three high-severity fixes (`distutils.strtobool` removal, per-run `deepcopy(configParams)`, ALMA seconds-vs-kyr frequency units), the second import-time stdin prompt in `TrajecAnalysis/__init__.py`, numpy pin, and dependency-compat fixes surfaced by running the suite (`matplotlib.cm.get_cmap` → `colormaps`, `np.row_stack` → `np.vstack`). **Validated:** the full `BuildTest` physics ran end-to-end (all bodies + auxiliary-flag tests + inductogram/exploreogram grids — 174 model computations, zero errors) in a provisioned scientific env.
+- **Phase 1 (Repo Cleanup)** — strays removed, brand assets to `assets/`, the frozen MATLAB tree consolidated under `legacy-matlab/`, and the 8-area scaffolding created (`backend/ frontend/ data-assets/ tests/ configs/`). The `PlanetProfile/` import package was left untouched (zero package files moved).
+- **LaTeX-free plotting** — all figures now render via matplotlib's built-in **mathtext** when no LaTeX is installed (a robust siunitx/mhchem → mathtext converter applied at the `Text.set_text` choke point). This removes the LaTeX prerequisite for headless/server plot generation and covers the Bayesian figures too.
+- **Bayesian Inference plot parity** — the current UI's Bayesian plots come from a custom `PlanetProfile.Inference` module (MCMC via pocoMC + simulation-based inference via `sbi`/`torch`) that exists only in the HF Space, not upstream. It has been **ported into MoonMelodies** as `PlanetProfile/Inference/` (a clean additive port — the module imports nothing our engine lacks), behind an optional `[inference]` extra (`torch, sbi, pocomc, TidalPy, corner, seaborn, PyYAML`). **Validated end-to-end:** a real Europa MCMC run (pocoMC, 4,270 posterior samples, r̂ = 1.0) generated **all 10** of the module's figures — corner, k₂ Re/Im scatter, ice-heating comparison, heating-vs-parameters, mass/CMR² diagnostics, CMR² surface, T_b-structure, layers-vs-ocean-depth, and both structure wedges (including the high-fidelity wedge from re-running the full engine at the posterior median).
+
+**Follow-ups this surfaced (fold into the phases below):**
+
+- **Structure-grid caches are download-on-demand.** The inference forward model interpolates precomputed structure-grid `.pkl` caches (10s of MB, Git-LFS in the Space) instead of running full PlanetProfile per sample. Teach `install.py` / the Inference cache-loader to fetch these on demand, the same pattern used for the 164 MB Perple_X tables — do **not** commit them to git.
+- **Runtime notes.** `torch` needs `KMP_DUPLICATE_LIB_OK=TRUE` on macOS (OpenMP duplicate-lib); inference must run from a working directory that has no `PlanetProfile/` subdirectory (a cwd-relative cache path otherwise shadows the package as a namespace package).
+- **Wiring for the new stack.** The 10 generators are a standalone library with no caller in the module (the Streamlit app drives them ad hoc). The Rust backend should own the orchestration: run the inference job, stream progress, and expose each figure; the frontend requests them. For live/interactive views, prefer **client-side rendering of the returned arrays** (see §4/§6) over server PNGs.
+- **Still deferred from Phase 1:** de-vendor MoonMag (BuildTest-gated), the git-history purge of large binaries (destructive — needs a coordinated force-push), and the packaging-identity rebrand to MoonMelodies (coupled to `PPversion.py` + a reinstall).
+
 ## Current State in One Page
 
 - **What it is.** A scientific engine, not an application. `PlanetProfile(Planet, Params)` in `PlanetProfile/Main.py` runs a fixed pipeline that propagates a body's layer structure and computes downstream geophysical observables. Runtimes range from minutes to hours; grid-exploration modes fan out across CPU cores.
