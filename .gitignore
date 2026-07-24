@@ -25,3 +25,6 @@ configPPmontecarlo.py
 startup.m
 Thermodynamics/MgSO4/phaseLookupMgSO4.mat
 WIP/*
+
+# Local run/output working directory (engine writes <cwd>/<Body>/ outputs here)
+runs/
