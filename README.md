@@ -1,26 +1,30 @@
-# PlanetProfile
-![PlanetProfile logo](assets/brand/PPlogoDocs.png)
+# MoonMelodies
+![MoonMelodies logo](assets/brand/PPlogoDocs.png)
 
-PlanetProfile is a software framework for constructing 1D interior structure models based on planetary properties. Self-consistent thermodynamics are used for fluid, rock, and mineral phases. Sound speeds, attenuation, and electrical conductivities are computed as outputs. The main code is called from an input file containing all the planetary data. 
+**MoonMelodies is a fork of [PlanetProfile](https://github.com/vancesteven/PlanetProfile)** — the open-source framework for building 1D interior-structure models of icy moons and ocean worlds — being developed toward an interactive, browser-based tool. The scientific engine is PlanetProfile's; MoonMelodies reorganizes it, hardens it for headless/server use, and is building a local Rust backend plus a GitHub-Pages frontend around it. The full plan lives in [`docs/spec/MoonMelodies_Spec_and_Refactor.md`](docs/spec/MoonMelodies_Spec_and_Refactor.md).
 
-The following is a non-comprehensive list of capabilities offered in PlanetProfile:
-- Self-consistent ocean world modeling: Coupling of geophysics with thermodynamic and transport properties dictated by input ocean geochemistry
-  - Available laboratory-measured ocean compositions: Pure water and Sodium Chloride (Seafreeze), Seawater (GSW), Magnesium Sulfate (Vance)
-  - Can now model arbitrary ocean compositions whose thermodynamics and transport properties are computationally simulated with the geochemical databases Frezchem and Supcrt adapted in the gibbs minimization modeling package Reaktoro
-- Self-consistent interior modeling: Coupling of silicate and core geophysics with thermodynamics dictated by material equation of states (i.e. CV, CM, etc.) defined by PerpleX
-- Forward model Tidal love numbers with PyALMA3
-- Forward model spherical harmonic and asymmetric magnetic induction responses with MoonMag
-- Large scale model explorations that forward model across 2 different properties (ExploreOgrams) or many models via Monte Carlo explorations
-- Export model data via .txt files, .pkl files, and .mat files
-- Built-in plots to visualize models
+> The **import package is still `PlanetProfile`** (so `from PlanetProfile... import ...` and `python -m PlanetProfile.*` are unchanged); only the installed distribution is named `MoonMelodies`.
 
-For the latest updates being introduced to PlanetProfile, check out the [CHANGELOG.md](CHANGELOG.md) file
+## What MoonMelodies adds
 
-**USERS WHO HAVE CLONED PLANETPROFILE PRIOR TO 2025 SHOULD REINSTALL A FRESH CLONE. SEE THE UNINSTALLING SECTION FOR MORE DETAILS**
-The code was rebased to push many changes undertaken over the past year. Due to new file size limitations, this meant excluding a large 
-Software framework for constructing 1D interior structure models based on planetary properties. Self-consistent thermodynamics are used for fluid, rock, and mineral phases. Sound speeds, attenuation, and electrical conductivities are computed as outputs. The main code is called from an input file containing all the planetary data.
+- **LaTeX-free plotting.** Every figure renders through matplotlib's built-in mathtext, so no LaTeX/siunitx installation is needed for headless or server-side plot generation.
+- **Bayesian interior inference.** MCMC (pocoMC) and simulation-based inference (`sbi`/`torch`) constrain interior parameters against tidal Love numbers, gravity, and magnetic-induction observables, with a full suite of posterior and diagnostic figures. Optional — install with `pip install ".[inference]"`.
+- **Reorganized repository.** The frozen MATLAB implementation is archived under `legacy-matlab/`; new areas `backend/` (Rust orchestration server), `frontend/` (static web UI), `data-assets/`, `tests/`, and `configs/` scaffold the web tool.
+- **Stabilized engine.** Imports cleanly on Python 3.12+, is safe to call repeatedly within one long-lived process (e.g. a backend server), and no longer blocks on import-time stdin prompts.
 
-The main repository is mirrored at <https://github.com/NASA-Planetary-Science/PlanetProfile>; any pull requests should be submitted to <https://github.com/vancesteven/PlanetProfile>. Read the software documentation at <https://vancesteven.github.io/PlanetProfile>.
+## The engine (PlanetProfile)
+
+PlanetProfile constructs 1D interior-structure models from planetary properties, using self-consistent thermodynamics for fluid, rock, and mineral phases, and computing sound speeds, attenuation, and electrical conductivities as outputs. The main code is driven by an input file containing all the planetary data. Capabilities:
+- Self-consistent ocean world modeling: coupling of geophysics with thermodynamic and transport properties dictated by input ocean geochemistry
+  - Laboratory-measured ocean compositions: pure water and sodium chloride (SeaFreeze), seawater (GSW), magnesium sulfate (Vance)
+  - Arbitrary ocean compositions whose thermodynamics and transport properties are simulated via the geochemical databases Frezchem and Supcrt in the Gibbs-minimization package Reaktoro
+- Self-consistent interior modeling: coupling of silicate and core geophysics with thermodynamics from material equations of state (CV, CM, etc.) defined by Perple_X
+- Forward-model tidal Love numbers with PyALMA3
+- Forward-model spherical-harmonic and asymmetric magnetic-induction responses with MoonMag
+- Large-scale model explorations across two properties (ExploreOgrams) or many models via Monte Carlo
+- Export model data via `.txt`, `.pkl`, and `.mat` files, and built-in plots to visualize models
+
+For the engine's own change history see [CHANGELOG.md](CHANGELOG.md). Upstream PlanetProfile is mirrored at <https://github.com/NASA-Planetary-Science/PlanetProfile>, with documentation at <https://vancesteven.github.io/PlanetProfile>.
 
 ## Acknowledging PlanetProfile
 We want to hear about your work with PlanetProfile! Please consider sending us a message alerting us to your work (steven.d.vance@jpl.nasa.gov). Suggested acknowledgement in publications: "Data used in this work were generated using the open-source _PlanetProfile_ software hosted on GitHub (<https://github.com/vancesteven/PlanetProfile>)." Please also cite: Vance et al. (2018) Geophysical investigations of habitability in ice-covered ocean worlds. Journal of Geophysical Research: Planets, 10.1002/2017JE005341. Styczinski, S. D. Vance, and M. Melwani Daswani (2023) PlanetProfile: Self-consistent interior structure modeling for ocean worlds and rocky dwarf planets in Python. Earth and Space Science, 10(8), 10.1029/2022ea002748.
@@ -38,6 +42,9 @@ However you install, you can run a test suite by "python Testing.py" from the ma
 Developers should add test modules for new features and ensure to run the full test suite before deploying updates.
 
 #### Pip installation
+
+> **MoonMelodies note:** this fork is not published to PyPI. Install it from a clone (see *Developers* below): `pip install -e .` at the repository root. For the optional Bayesian-inference features (`PlanetProfile.Inference`) add the extra — `pip install -e ".[inference]"` — which pulls a heavy ML stack (torch, sbi, pocomc, TidalPy). The steps below describe the upstream **PlanetProfile** PyPI package.
+
 1. (Recommended) Install all dependencies listed in the next section before proceeding.
 1. At a terminal:
 `python -m pip install PlanetProfile`
