@@ -74,6 +74,11 @@ or
 `python PlanetProfileCLI.py path/to/PPBody.py`
 
 ### *For Matlab*
+  > **Note:** The MATLAB implementation is frozen and now lives under
+  > [`legacy-matlab/`](legacy-matlab/) (moved out of the repo root during cleanup).
+  > The `make install`, `config.m`, `PlanetProfile.m`, and per-body `PP<Body>.m`
+  > files referenced below are all under that directory. New development is
+  > Python-only in `PlanetProfile/`.
   1. Download or clone this repository.
   1. Install prerequisites below.
   1. At a terminal: 
