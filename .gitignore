@@ -28,3 +28,6 @@ WIP/*
 
 # Local run/output working directory (engine writes <cwd>/<Body>/ outputs here)
 runs/
+UserConfigs/
+*.egg-info/
+PlanetProfile/Test/mcmc_results/

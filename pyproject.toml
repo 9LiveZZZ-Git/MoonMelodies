@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "PlanetProfile"
+name = "MoonMelodies"
 version = "3.1.5"
 authors = [
     {name = "Steven D. Vance", email = "steven.d.vance@jpl.nasa.gov"},
@@ -65,12 +65,14 @@ inference = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/vancesteven/PlanetProfile"
+Homepage = "https://github.com/9LiveZZZ-Git/MoonMelodies"
+Repository = "https://github.com/9LiveZZZ-Git/MoonMelodies"
+"Bug Tracker" = "https://github.com/9LiveZZZ-Git/MoonMelodies/issues"
+Changelog = "https://github.com/9LiveZZZ-Git/MoonMelodies/blob/main/CHANGELOG.md"
+# Upstream scientific project this fork is built on:
+"PlanetProfile (upstream)" = "https://github.com/vancesteven/PlanetProfile"
 Documentation = "https://vancesteven.github.io/PlanetProfile"
-Repository = "https://github.com/vancesteven/PlanetProfile"
-"Bug Tracker" = "https://github.com/vancesteven/PlanetProfile/issues"
 Publication = "https://doi.org/10.1029/2022EA002748"
-Changelog = "https://github.com/vancesteven/PlanetProfile/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 include-package-data = true

@@ -14,7 +14,13 @@ from importlib.metadata import version, PackageNotFoundError
 
 # Get PlanetProfile version from installed package metadata (pyproject.toml is source of truth)
 
-ppVerNum = version('PlanetProfile')
+try:
+    ppVerNum = version('MoonMelodies')
+except PackageNotFoundError:
+    try:
+        ppVerNum = version('PlanetProfile')   # upstream / pre-rebrand installs
+    except PackageNotFoundError:
+        ppVerNum = '0+unknown'                # running from source, not installed
 
 # Compatible version tag numbers
 compatNums = {
