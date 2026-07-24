@@ -1,5 +1,5 @@
 # PlanetProfile
-![PlanetProfile logo](misc/PPlogoDocs.png)
+![PlanetProfile logo](assets/brand/PPlogoDocs.png)
 
 PlanetProfile is a software framework for constructing 1D interior structure models based on planetary properties. Self-consistent thermodynamics are used for fluid, rock, and mineral phases. Sound speeds, attenuation, and electrical conductivities are computed as outputs. The main code is called from an input file containing all the planetary data. 
 

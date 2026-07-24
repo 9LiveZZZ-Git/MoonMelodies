@@ -155,7 +155,7 @@ In the event of a major restructure, Sphinx is not well set up to reformat the d
    1. `pythonModules.txt`
    1. `.gitignore`
    1. `.nojekyll`
-   1. `misc/` and its contents
+   1. `assets/brand/` and its contents
    1. `templates/` and its contents
    1. `SPICE/` and its contents
 1. Delete the entire `docs` directory

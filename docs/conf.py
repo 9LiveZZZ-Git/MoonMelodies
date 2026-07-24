@@ -54,8 +54,8 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'configP*']
 
 html_theme = 'sphinx_rtd_theme'  # Install with pip install sphinx-rtd-theme
 html_static_path = ['_static']
-html_logo = '../misc/PPlogo.png'
-html_favicon = '../misc/PPlogo.ico'
+html_logo = '../assets/brand/PPlogo.png'
+html_favicon = '../assets/brand/PPlogo.ico'
 
 html_theme_options = {
     'display_version': True,
