@@ -1,4 +1,4 @@
-import os, shutil
+import os, shutil, sys
 import matplotlib.pyplot as plt
 import platformdirs
 
@@ -72,8 +72,19 @@ _userConfigMonteCarlo = os.path.join('UserConfigs', 'configPPmontecarlo.py')
 configTemplates = [_defaultConfig, _defaultConfigPlots, _defaultConfigInduct, _defaultConfigTrajec, _defaultConfigCustomSolution, _defaultConfigGravity, _defaultConfigInversion, _defaultConfigMonteCarlo]
 configLocals = [_userConfig, _userConfigPlots, _userConfigInduct, _userConfigTrajec, _userConfigCustomSolution, _userConfigGravity, _userConfigInversion, _userConfigMonteCarlo]
 if any([not os.path.isfile(cfg) for cfg in configLocals]):
-    if input(f'configPP files not found in pwd: {os.path.join(os.getcwd(), "UserConfigs")}. Copy from defaults to local dir? ' +
-             f'y/n ') in ['', 'y', 'Y', 'yes', 'Yes', '[y]']:
+    # Only prompt when attached to an interactive terminal. In a non-interactive context
+    # (a backend server, notebook, CI, or piped stdin) input() raises EOFError at import
+    # time and makes the whole package unimportable, so fall back to copying the defaults
+    # automatically -- the same action an interactive 'y' takes.
+    _interactive = bool(getattr(sys, 'stdin', None)) and sys.stdin.isatty()
+    if _interactive:
+        _doCopyConfigs = input(f'configPP files not found in pwd: {os.path.join(os.getcwd(), "UserConfigs")}. Copy from defaults to local dir? ' +
+                               f'y/n ') in ['', 'y', 'Y', 'yes', 'Yes', '[y]']
+    else:
+        print(f'configPP files not found in {os.path.join(os.getcwd(), "UserConfigs")}; '
+              f'copying defaults automatically (non-interactive session).')
+        _doCopyConfigs = True
+    if _doCopyConfigs:
         for template, local in zip(configTemplates, configLocals):
             CopyOnlyIfNeeded(template, local)
 

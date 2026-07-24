@@ -186,8 +186,13 @@ def love_numbers(model,degrees,timesteps,loadtype,mode,order,verbose=False,inter
     """
     love_numbers(degrees,timesteps,loadtype,loadfcn,tau,mode,order)
 
-    timesteps are ALMA time values in kyr. Callers with periods in seconds
-    should divide by 1000 Julian years before calling this function.
+    timesteps are the forcing timescale(s) for the chosen mode, and their unit MUST
+    match the model's normalization. For a model built with norm=True the timestep is
+    in ALMA units (kyr). For a model built with norm=False (SI viscosities in Pa*s), the
+    timestep must be in SECONDS: the periodic branch uses omega = 2*pi/t directly as the
+    complex frequency s = 1j*omega, which is compared against the per-second relaxation
+    rate mu/eta, so a kyr timestep would inflate the frequency by ~3.156e10 and corrupt
+    the imaginary (dissipative) parts of the Love numbers.
     """
 
     if loadtype.lower()=='tidal':

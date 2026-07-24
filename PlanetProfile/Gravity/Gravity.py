@@ -205,8 +205,14 @@ def ComputeGravityObservations(Planet, Params):
     Planet.Gravity.Torb_s = Torb_s
     Planet.Gravity.eccentricity = eccentricity
 
-    # ALMA's time argument is in kyr, while Planet.Bulk.Torb_s is stored in seconds.
-    h, l, k, y = pyALMA3Updated.love_numbers(model_params, [2], [Torb_kyr], 'tidal',
+    # build_model above uses norm=False, so the viscosities stay in SI (Pa*s) and the
+    # physical relaxation frequency mu/eta is per second. love_numbers computes the
+    # forcing frequency directly as omega = 2*pi/t, so the period passed here MUST be in
+    # seconds for omega to come out in rad/s and be consistent with the SI viscosities.
+    # Passing Torb_kyr instead would inflate omega by t0 (~3.156e10) and silently corrupt
+    # the imaginary parts of h2/l2/k2 and every derived dissipation/libration quantity.
+    # (Torb_kyr is kept only as stored metadata in Planet.Gravity.time_log_kyrs above.)
+    h, l, k, y = pyALMA3Updated.love_numbers(model_params, [2], [Torb_s], 'tidal',
                                       'periodic', Params.Gravity.gorder,
                                       verbose=(not Params.QUIET_ALMA and Params.Gravity.verbose),
                                       internal=True)

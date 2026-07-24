@@ -12,7 +12,6 @@ import pickle
 import logging
 from scipy.io import savemat, loadmat
 from copy import deepcopy
-from distutils.util import strtobool
 from collections.abc import Iterable
 from os.path import isfile
 from glob import glob as FilesMatchingPattern
@@ -54,6 +53,23 @@ mtpContext = mtp.get_context(mtpType)
 # Assign logger
 log = logging.getLogger('PlanetProfile')
 
+
+def strtobool(val):
+    """ Convert a string representation of truth to 1 (true) or 0 (false).
+
+        Local replacement for distutils.util.strtobool, which was removed from the
+        standard library in Python 3.12 (PEP 632). True values are 'y', 'yes', 't',
+        'true', 'on', and '1'; false values are 'n', 'no', 'f', 'false', 'off', and
+        '0'. Raises ValueError for anything else, matching the original behavior.
+    """
+    val = str(val).strip().lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return 1
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return 0
+    raise ValueError(f'invalid truth value {val!r}')
+
+
 """ MAIN RUN BLOCK """
 def run(bodyname=None, opt=None, fNames=None):
 
@@ -66,8 +82,10 @@ def run(bodyname=None, opt=None, fNames=None):
 
     # Intializing timing structure
     Timing.setStartingTime(time.time())
-    # Copy global Params settings to local variable so we can add things like filenames
-    Params = configParams
+    # Snapshot the global config into a per-run copy so that flags applied by ExecOpts
+    # (CALC_NEW, COMPARE, NO_SAVEFILE, DO_INDUCTOGRAM, ...) and any later mutations cannot
+    # leak into subsequent runs sharing this process (e.g. a long-lived backend server).
+    Params = deepcopy(configParams)
     
     if fNames is None and bodyname is None:
         log.info('No body name entered. Defaulting to Europa.')
@@ -656,7 +674,7 @@ def ReloadProfile(Planet, Params, fnameOverride=None):
         bodyname = fnameOverride.split('Profile')[0].split(os.sep)[-1]
         Planet = PlanetStruct(bodyname)
     if Params is None:
-        Params = configParams
+        Params = deepcopy(configParams)
 
     if fnameOverride is not None:
         Params.DataFiles.saveFile = fnameOverride
@@ -787,7 +805,7 @@ def ReloadProfile(Planet, Params, fnameOverride=None):
 
 def InitBayes(bodyname, fEnd):
     """ Load in a specific profile to use as an initial prior in Bayesian analysis. """
-    Params = configParams
+    Params = deepcopy(configParams)
     # Prevent unnecessary slowdowns and disk space usage
     Params.NO_SAVEFILE = True
     Params.SKIP_PLOTS = True
@@ -1971,7 +1989,7 @@ def RunPPfile(bodyname, fName, Params=None):
     else:
         loadName = fName
     if Params is None:
-        Params = configParams
+        Params = deepcopy(configParams)
     fName = f'{loadName}.py'
     expected = os.path.join(bodyname, fName)
     if not os.path.isfile(expected):
