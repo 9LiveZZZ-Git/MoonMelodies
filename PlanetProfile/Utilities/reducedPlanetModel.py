@@ -48,7 +48,7 @@ def GetMagneticReducedLayers(Planet, Params):
             if Params.CALC_NEW or not Params.DO_INDUCTOGRAM:
                 # Obtain radius and induction of layers
                 rLayers_m = Planet.r_m[:-1]
-                sigmaInduct_Sm = Planet.sigma_Sm
+                sigmaInduct_Sm = Planet.sigma_Sm.copy()
                 # Obtain other properties for reduced planet that are necessary
                 # Eliminate NaN values and 0 values, assigning them to a default minimum
                 sigmaInduct_Sm[np.logical_or(np.isnan(sigmaInduct_Sm), sigmaInduct_Sm == 0)] = Constants.sigmaDef_Sm

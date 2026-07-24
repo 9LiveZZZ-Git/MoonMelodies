@@ -90,6 +90,8 @@ def run(bodyname=None, opt=None, fNames=None):
     if fNames is None and bodyname is None:
         log.info('No body name entered. Defaulting to Europa.')
         bodyname = 'Europa'
+    elif bodyname is None:
+        bodyname = ''   # filenames given without a body name (e.g. reload by path)
     bodyname = bodyname.capitalize()
     if bodyname != '':
         log.info(f'Body name: {bodyname}')
@@ -221,7 +223,8 @@ def run(bodyname=None, opt=None, fNames=None):
         # Loading BodyProfile...txt files to plot them together
         if Params.COMPARE and len(loadNames)>1 and not Params.RUN_ALL_PROFILES:
             fNamesToCompare = np.array(FilesMatchingPattern(os.path.join(PlanetList[0].bodyname, f'{PlanetList[0].name}Profile*.txt')))
-            isProfile = [Params.DataFiles.saveFile != fName and 'mantle' not in fName for fName in fNamesToCompare]
+            isProfile = [Params.DataFiles.saveFile != fName and 'mantle' not in fName
+                         and 'OceanProps' not in fName and 'Perm' not in fName for fName in fNamesToCompare]
             fProfiles = fNamesToCompare[isProfile]
             nCompare = np.size(fProfiles) + 1
             log.info('Loading comparison profiles.')
@@ -468,7 +471,7 @@ def ExecOpts(Params, bodyname, opt, fNames=None):
             Params.RUN_ALL_PROFILES = True
             Params.COMPARE = True
         if opt == 'reload':
-            for fName in fNames:
+            for fName in list(fNames):   # iterate a copy; the loop removes from fNames
                 if os.path.split(fName)[0] == '':
                     expected = os.path.join(bodyname, fName)
                 else:
@@ -484,7 +487,7 @@ def ExecOpts(Params, bodyname, opt, fNames=None):
             if np.size(fNames) == 0:
                 raise ValueError('None of the specified PP files were found.')
         else:
-            for fName in fNames:
+            for fName in list(fNames):   # iterate a copy; the loop removes from fNames
                 if os.path.split(fName)[0] == '':
                     expected = os.path.join(bodyname, fName)
                 else:
@@ -679,8 +682,8 @@ def ReloadProfile(Planet, Params, fnameOverride=None):
     if fnameOverride is not None:
         Params.DataFiles.saveFile = fnameOverride
         Params.DataFiles.mantCoreFile = f'{fnameOverride[:-4]}_mantleCore.txt'
-        Params.DataFiles.mantPermFile = f'{fnameOverride[:-4]}_mantlePerm.txt'
-        Params.DataFiles.oceanPropsFile = f'{fnameOverride[:-4]}_oceanProps.txt'
+        Params.DataFiles.permFile = f'{fnameOverride[:-4]}_mantlePerm.txt'
+        Params.DataFiles.oceanPropsFile = f'{fnameOverride[:-4]}_liquidOceanProps.txt'
         nSkip = len(os.path.join(Planet.bodyname, f'{Planet.name}Profile_'))
         Planet.saveLabel = fnameOverride[nSkip:-4]
     else:
@@ -770,14 +773,18 @@ def ReloadProfile(Planet, Params, fnameOverride=None):
         Planet.THIN_OCEAN = True
 
     # Read in data for core/mantle trade
-    Planet.Sil.Rtrade_m, Planet.Core.Rtrade_m, Planet.Sil.rhoTrade_kgm3, \
-        = np.loadtxt(Params.DataFiles.mantCoreFile, skiprows=1, unpack=True)
+    if os.path.isfile(Params.DataFiles.mantCoreFile):
+        Planet.Sil.Rtrade_m, Planet.Core.Rtrade_m, Planet.Sil.rhoTrade_kgm3, \
+            = np.loadtxt(Params.DataFiles.mantCoreFile, skiprows=1, unpack=True)
+    else:
+        log.warning(f'Mantle/core trade file not found on reload: {Params.DataFiles.mantCoreFile}. Setting trade arrays to nan.')
+        Planet.Sil.Rtrade_m = Planet.Core.Rtrade_m = Planet.Sil.rhoTrade_kgm3 = np.nan
 
     # Read in data for ocean properties
     if Planet.Do.NO_H2O or Planet.Do.NO_DIFFERENTIATION or Planet.Do.PARTIAL_DIFFERENTIATION:
         Planet.Do.NO_OCEAN = True
     if not Planet.Do.NO_OCEAN:
-        if Params.CALC_OCEAN_PROPS:
+        if Params.CALC_OCEAN_PROPS and os.path.isfile(Params.DataFiles.oceanPropsFile):
             with open(Params.DataFiles.oceanPropsFile) as f:
                 nHeadLines = int(f.readline().split('=')[-1])
                 Planet.Ocean.aqueousSpecies = np.array(f.readline().split('=')[-1].strip().replace(';', '').split())
@@ -1461,14 +1468,18 @@ def GridPlanetProfileFunc(FuncName, PlanetGrid, Params):
         PrecomputeEOS(PlanetList1D, Params)
     if Params.DO_PARALLEL:
         # Prevent slowdowns from competing process spawning when #cores > #jobs
-        nCores = np.min([Params.maxCores, np.prod(np.shape(PlanetList1D)), Params.threadLimit])
+        nCores = int(np.max([1, np.min([Params.maxCores, np.size(PlanetList1D), Params.threadLimit])]))
         pool = mtpContext.Pool(nCores)
         parResult = [pool.apply_async(FuncName, (deepcopy(Planet), deepcopy(Params))) for Planet in PlanetList1D]
         pool.close()
         pool.join()
 
         for i, result in enumerate(parResult):
-            PlanetList1D[i] = result.get()[0]
+            try:
+                PlanetList1D[i] = result.get()[0]
+            except Exception as e:
+                log.warning(f'Parallel grid worker {i} failed ({type(e).__name__}: {e}); marking that model invalid and keeping the rest of the grid.')
+                PlanetList1D[i].Do.VALID = False
     else:
         log.profile('Running grid without parallel processing. This may take some time.')
         PlanetList1D = np.array([FuncName(deepcopy(Planet), deepcopy(Params)) for Planet in PlanetList1D])[:, 0]

@@ -41,7 +41,7 @@ if __name__ == '__main__':
             fNames = os.path.split(fNames[0])[1:]
         else:
             bodynames = [os.path.split(fName)[0] for fName in fNames]
-            if np.all(bodynames == bodynames[0]):
+            if all(bn == bodynames[0] for bn in bodynames):
                 bodyname = bodynames[0]
                 fNames = [os.path.split(fName)[1] for fName in fNames]
             else:

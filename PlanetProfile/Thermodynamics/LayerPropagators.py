@@ -1108,7 +1108,7 @@ def SelfConsistentInnerLayer(Planet, Params):
 
         # Check for any negative temperature gradient (indicates non-equilibrium conditions)
         gradTneg = np.where(np.diff(Planet.T_K) < 0)
-        if np.any(gradTneg) and not Params.SKIP_INNER:
+        if np.size(gradTneg[0]) > 0 and not Params.SKIP_INNER:
             log.warning(f'Negative temperature gradient starting at index {gradTneg[0][0]:d}. This indicates that ' +
                         'internal heating parameters Qrad_Wkg and/or Htidal_Wm3 are likely set too high to be consistent ' +
                         'with the heat flux into the ocean. The current configuration represents a ' +

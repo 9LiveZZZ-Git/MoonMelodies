@@ -26,7 +26,17 @@ if not os.path.isfile(defLSK):
     raise FileNotFoundError(f'Leapseconds kernel was not found at {defLSK}. This likely means PlanetProfile ' +
                             f'has not been fully installed. Run the install script with the following command:\n' +
                             f'python -m PlanetProfile.install')
-spice.furnsh(defLSK)
+
+_furnshedKernels = set()
+def _furnshOnce(kernelPath):
+    """ Furnish a SPICE kernel only once per process, so re-importing or re-initializing
+        config (e.g. inside a long-lived server) does not stack duplicate kernel loads. """
+    kp = os.path.abspath(kernelPath)
+    if kp not in _furnshedKernels:
+        spice.furnsh(kernelPath)
+        _furnshedKernels.add(kp)
+
+_furnshOnce(defLSK)
 SigParams, ExcSpecParams, InductParams, _ = inductAssign()
 TrajecParams = trajecAssign()
 CustomSolutionParams = customSolutionAssign()
@@ -115,14 +125,14 @@ def loadUserSettings(configModule: str = ''):
             raise FileNotFoundError(f'Leapseconds kernel was not found at {userLSK}. This likely means PlanetProfile ' +
                                     f'has not been fully installed. Run the install script with the following command:\n' +
                                     f'python -m PlanetProfile.install')
-        spice.furnsh(userLSK)
+        _furnshOnce(userLSK)
     else:
         defLSK = os.path.join(Params.spiceDir, Params.spiceTLS)
         if not os.path.isfile(defLSK):
             raise FileNotFoundError(f'Leapseconds kernel was not found at {defLSK}. This likely means PlanetProfile ' +
                                     f'has not been fully installed. Run the install script with the following command:\n' +
                                     f'python -m PlanetProfile.install')
-        spice.furnsh(defLSK)
+        _furnshOnce(defLSK)
     configInduct = importlib.import_module(configModule + '.configPPinduct')
     userConfigInductVersion = configInduct.configInductVersion
     configTrajec = importlib.import_module(configModule + '.configPPtrajec')

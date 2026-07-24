@@ -73,7 +73,7 @@ def SeismicCalcs(Planet, Params):
             if np.size(indsMixedClath) != 0:
                 if Planet.Ocean.surfIceEOS[clathPhase].key not in EOSlist.loaded.keys():
                     PIce_MPa = np.linspace(Planet.P_MPa[indsMixedClath][0], Planet.P_MPa[indsMixedClath][-1] + Planet.Ocean.deltaP * 3, np.maximum(np.size(indsMixedClath), 4))
-                    TIce_K = np.linspace(Planet.T_MPa[indsMixedClath][0], Planet.T_MPa[indsMixedClath][-1] + Planet.Ocean.deltaT * 3, np.maximum(np.size(indsMixedClath), 4))
+                    TIce_K = np.linspace(Planet.T_K[indsMixedClath][0], Planet.T_K[indsMixedClath][-1] + Planet.Ocean.deltaT * 3, np.maximum(np.size(indsMixedClath), 4))
                     Planet.Ocean.surfIceEOS[clathPhase] = GetPlanetIceEOS(Planet, Params, PIce_MPa, TIce_K, clathPhase)
                 Planet.Seismic.VP_kms[indsMixedClath], Planet.Seismic.VS_kms[indsMixedClath], \
                 Planet.Seismic.KS_GPa[indsMixedClath], Planet.Seismic.GS_GPa[indsMixedClath] \

@@ -51,7 +51,7 @@ def SetupInit(Planet, Params):
     if Params.CALC_NEW_GRAVITY: CheckCompat('pyalma3')
     
     # Validate constant-property settings are properly set
-    if np.any(Planet.Do.ConstantProps.values()):
+    if any(Planet.Do.ConstantProps.values()):
         ValidateConstantProps(Planet)
         if Planet.Do.ConstantProps['Ocean']:
             Planet.Ocean.comp = 'PureH2O'
@@ -1026,7 +1026,7 @@ def PrecomputeEOS(PlanetList, Params):
             log.profile(f'Pre-generating CustomSolution ocean EOS for {len(uniqueEOSCustomSolutions)} CustomSolution compositions. {msg}')
             if Params.DO_PARALLEL:
                 # Prevent slowdowns from competing process spawning when #cores > #jobs
-                nCores = np.min([Params.maxCores, np.prod(np.shape(uniqueEOSCustomSolutions)), Params.threadLimit])
+                nCores = int(np.min([Params.maxCores, len(uniqueEOSCustomSolutions), Params.threadLimit]))
                 pool = mtpContext.Pool(nCores)
                 parResult = [pool.apply_async(SetupCustomSolutionEOS, (deepcopy(comp), deepcopy(wOcean_ppt))) for comp, wOcean_ppt in uniqueEOSCustomSolutions]
                 pool.close()

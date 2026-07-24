@@ -253,7 +253,7 @@ def CalcInducedMoments(Planet, Params):
                                  if CALCED and key in Excitations.Texc_hr[Planet.bodyname].keys()
                                  and Excitations.Texc_hr[Planet.bodyname][key] is not None]
     # Save calculated magnetic moments to disk
-    if (not Params.NO_SAVEFILE) and (not Params.INVERSION_IN_PROGRESS or not Params.MONTECARLO_IN_PROGRESS):
+    if (not Params.NO_SAVEFILE) and (not Params.INVERSION_IN_PROGRESS and not Params.MONTECARLO_IN_PROGRESS):
         saveDict = {
             'Benm_nT': Planet.Magnetic.Benm_nT,
             'Binm_nT': Planet.Magnetic.Binm_nT,
