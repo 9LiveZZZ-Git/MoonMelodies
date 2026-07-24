@@ -4,14 +4,20 @@ interior structure models.
 """
 
 import os
+import sys
 
 import numpy as np
 
 dirName = 'SpacecraftMAGdata'
 _MAGdir = os.path.join(os.getcwd(), dirName)
 if not os.path.exists(_MAGdir):
-    yn = input(f'{dirName} directory not found in pwd. Create it? [y]/n ')
-    if yn in ['', 'y', 'Y', 'yes', 'Yes']:
+    # Only prompt on an interactive terminal. In a non-interactive context (a backend
+    # server, notebook, CI, or piped stdin) input() raises EOFError at import time and
+    # makes the package unimportable, so default to creating the directory ('[y]').
+    _interactive = bool(getattr(sys, 'stdin', None)) and sys.stdin.isatty()
+    _createMAGdir = (not _interactive) or \
+        input(f'{dirName} directory not found in pwd. Create it? [y]/n ') in ['', 'y', 'Y', 'yes', 'Yes']
+    if _createMAGdir:
         os.mkdir(_MAGdir)
         _scList = next(os.walk(_MAGdir))[1]
     else:

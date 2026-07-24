@@ -1484,7 +1484,7 @@ class ColorStruct:
             cList = hsv_to_rgb(np.column_stack((hueMap, satMap, valMap)))
         else:
             # Just use standard evaluation of the colorbar
-            cList = np.row_stack([self.cmap[comp](T) for comp, T in zip(comps, Tmean_normFrac)])
+            cList = np.vstack([self.cmap[comp](T) for comp, T in zip(comps, Tmean_normFrac)])
 
         return cList
 
