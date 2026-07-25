@@ -1,166 +1,140 @@
 # MoonMelodies
 ![MoonMelodies logo](assets/brand/PPlogoDocs.png)
 
-**MoonMelodies is a fork of [PlanetProfile](https://github.com/vancesteven/PlanetProfile)** — the open-source framework for building 1D interior-structure models of icy moons and ocean worlds — being developed toward an interactive, browser-based tool. The scientific engine is PlanetProfile's; MoonMelodies reorganizes it, hardens it for headless/server use, and is building a local Rust backend plus a GitHub-Pages frontend around it. The full plan lives in [`docs/spec/MoonMelodies_Spec_and_Refactor.md`](docs/spec/MoonMelodies_Spec_and_Refactor.md).
+**MoonMelodies is a fork of [PlanetProfile](https://github.com/vancesteven/PlanetProfile)** — the open-source framework for building 1D interior-structure models of icy moons and ocean worlds. MoonMelodies keeps PlanetProfile's scientific engine **unchanged** and builds an interactive, browser-based tool around it: it reorganizes and slims the repository, hardens the engine for headless/server use, and adds a declarative JSON API so the physics can be driven by a local backend and a static web frontend instead of by hand-edited Python files.
 
-> The **import package is still `PlanetProfile`** (so `from PlanetProfile... import ...` and `python -m PlanetProfile.*` are unchanged); only the installed distribution is named `MoonMelodies`.
+The full plan and design live in [`docs/spec/MoonMelodies_Spec_and_Refactor.md`](docs/spec/MoonMelodies_Spec_and_Refactor.md).
+
+> **The import package is still `PlanetProfile`.** `from PlanetProfile... import ...` and `python -m PlanetProfile.*` are unchanged; only the installed *distribution* is named `MoonMelodies`. This keeps every model file, script, and downstream import working exactly as upstream.
+
+---
+
+## Credit — the science is PlanetProfile's
+
+MoonMelodies is a wrapper-and-tooling fork. **All of the interior-structure physics is PlanetProfile**, created and maintained by Steven D. Vance and collaborators. If you use MoonMelodies for research, please credit PlanetProfile:
+
+- Upstream repository: <https://github.com/vancesteven/PlanetProfile> (NASA mirror: <https://github.com/NASA-Planetary-Science/PlanetProfile>; docs: <https://vancesteven.github.io/PlanetProfile>)
+- Suggested acknowledgement: *"Data used in this work were generated using the open-source PlanetProfile software hosted on GitHub (https://github.com/vancesteven/PlanetProfile)."*
+- Please cite:
+  - Vance et al. (2018), *Geophysical investigations of habitability in ice-covered ocean worlds*, JGR: Planets, [10.1002/2017JE005341](https://doi.org/10.1002/2017JE005341).
+  - Styczinski, Vance, and Melwani Daswani (2023), *PlanetProfile: Self-consistent interior structure modeling for ocean worlds and rocky dwarf planets in Python*, Earth and Space Science, 10(8), [10.1029/2022EA002748](https://doi.org/10.1029/2022EA002748).
+
+We'd also love to hear about your work — reach the PlanetProfile team at steven.d.vance@jpl.nasa.gov.
+
+---
 
 ## What MoonMelodies adds
 
+Relative to upstream PlanetProfile, this fork contributes:
+
+- **A declarative JSON API boundary** (`PlanetProfile/API/`). A whitelist mapper builds the engine's `PlanetStruct` from plain JSON — never by importing a user `PP<Body>.py` file — and a thin `ppworker` harness runs models over stdin/stdout, so the engine can be driven safely by a server or UI. Verified to reproduce a CLI run bit-for-bit.
 - **LaTeX-free plotting.** Every figure renders through matplotlib's built-in mathtext, so no LaTeX/siunitx installation is needed for headless or server-side plot generation.
-- **Bayesian interior inference.** MCMC (pocoMC) and simulation-based inference (`sbi`/`torch`) constrain interior parameters against tidal Love numbers, gravity, and magnetic-induction observables, with a full suite of posterior and diagnostic figures. Optional — install with `pip install ".[inference]"`.
-- **Reorganized repository.** The frozen MATLAB implementation is archived under `legacy-matlab/`; new areas `backend/` (Rust orchestration server), `frontend/` (static web UI), `data-assets/`, `tests/`, and `configs/` scaffold the web tool.
-- **Stabilized engine.** Imports cleanly on Python 3.12+, is safe to call repeatedly within one long-lived process (e.g. a backend server), and no longer blocks on import-time stdin prompts.
+- **Bayesian interior inference** (`PlanetProfile.Inference`). MCMC (pocoMC) and simulation-based inference (`sbi`/`torch`) constrain interior parameters against tidal Love numbers, gravity, and magnetic-induction observables, with a full suite of posterior and diagnostic figures. Optional — `pip install -e ".[inference]"`.
+- **A stabilized engine.** Imports cleanly on modern Python, is safe to call repeatedly within one long-lived process (per-run config isolation), no longer blocks on import-time stdin prompts, and ships with a regression-test suite (`tests/`). The full `BuildTest` physics suite runs green.
+- **A much smaller repository.** The frozen MATLAB implementation is archived under `legacy-matlab/`, large binary data was purged from git history (`.git` shrank ~94%), and the Perple_X EOS tables are fetched on install rather than committed.
+
+**Planned (see the spec):** a local-only **Python (FastAPI) backend** that orchestrates a warm pool of `ppworker` processes, and a **static GitHub-Pages frontend** that talks to it at `127.0.0.1` and renders results in-browser. The `backend/` and `frontend/` directories are scaffolds for that work.
+
+---
 
 ## The engine (PlanetProfile)
 
-PlanetProfile constructs 1D interior-structure models from planetary properties, using self-consistent thermodynamics for fluid, rock, and mineral phases, and computing sound speeds, attenuation, and electrical conductivities as outputs. The main code is driven by an input file containing all the planetary data. Capabilities:
-- Self-consistent ocean world modeling: coupling of geophysics with thermodynamic and transport properties dictated by input ocean geochemistry
-  - Laboratory-measured ocean compositions: pure water and sodium chloride (SeaFreeze), seawater (GSW), magnesium sulfate (Vance)
-  - Arbitrary ocean compositions whose thermodynamics and transport properties are simulated via the geochemical databases Frezchem and Supcrt in the Gibbs-minimization package Reaktoro
-- Self-consistent interior modeling: coupling of silicate and core geophysics with thermodynamics from material equations of state (CV, CM, etc.) defined by Perple_X
-- Forward-model tidal Love numbers with PyALMA3
-- Forward-model spherical-harmonic and asymmetric magnetic-induction responses with MoonMag
-- Large-scale model explorations across two properties (ExploreOgrams) or many models via Monte Carlo
-- Export model data via `.txt`, `.pkl`, and `.mat` files, and built-in plots to visualize models
+PlanetProfile constructs 1D interior-structure models from a body's bulk properties, using self-consistent thermodynamics for fluid, rock, and mineral phases, and derives sound speeds, seismic attenuation, electrical conductivity, magnetic-induction responses, tidal Love numbers, and gravity. A model is defined by an input `PP<Body>.py` file. Capabilities:
 
-For the engine's own change history see [CHANGELOG.md](CHANGELOG.md). Upstream PlanetProfile is mirrored at <https://github.com/NASA-Planetary-Science/PlanetProfile>, with documentation at <https://vancesteven.github.io/PlanetProfile>.
+- **Self-consistent ocean-world modeling** — geophysics coupled to thermodynamic and transport properties set by the ocean geochemistry:
+  - Laboratory-measured compositions: pure water and NaCl (SeaFreeze), seawater (GSW/TEOS-10), MgSO₄ (Vance tables).
+  - Arbitrary compositions via the Frezchem/Supcrt geochemical databases in the Gibbs-minimization package Reaktoro.
+- **Self-consistent interior modeling** — silicate and core geophysics coupled to material equations of state (CV, CM, …) from Perple_X.
+- **Tidal Love numbers** via PyALMA3.
+- **Spherical-harmonic and asymmetric magnetic-induction** responses via MoonMag.
+- **Large-scale explorations** across two parameters (ExploreOgram/InductOgram) or many models via Monte Carlo.
+- **Exports** to `.txt`, `.pkl`, and `.mat`, plus built-in plots.
 
-## Acknowledging PlanetProfile
-We want to hear about your work with PlanetProfile! Please consider sending us a message alerting us to your work (steven.d.vance@jpl.nasa.gov). Suggested acknowledgement in publications: "Data used in this work were generated using the open-source _PlanetProfile_ software hosted on GitHub (<https://github.com/vancesteven/PlanetProfile>)." Please also cite: Vance et al. (2018) Geophysical investigations of habitability in ice-covered ocean worlds. Journal of Geophysical Research: Planets, 10.1002/2017JE005341. Styczinski, S. D. Vance, and M. Melwani Daswani (2023) PlanetProfile: Self-consistent interior structure modeling for ocean worlds and rocky dwarf planets in Python. Earth and Space Science, 10(8), 10.1029/2022ea002748.
+The engine's own change history is in [CHANGELOG.md](CHANGELOG.md).
 
-
+---
 
 ## Getting started
-PlanetProfile is available in Python and Matlab.
 
-### *For Python*
-The recommended way to install is with pip. 
-Developers: see below--do not install via pip.
+MoonMelodies is developed from a clone (it is **not** published to PyPI). The scientific stack has heavyweight compiled dependencies, so a conda/mamba environment is strongly recommended.
 
-However you install, you can run a test suite by "python Testing.py" from the main PlanetProfile directory.
-Developers should add test modules for new features and ensure to run the full test suite before deploying updates.
+```bash
+# 1. Create an environment with the native scientific dependencies
+mamba create -n moonmelodies python=3.11
+mamba activate moonmelodies
+mamba install -c conda-forge numpy scipy matplotlib mpmath pandas gsw spiceypy cmasher reaktoro obspy
+pip install SeaFreeze hdf5storage PyALMA3
 
-#### Pip installation
+# 2. Clone and install this fork (editable)
+git clone https://github.com/9LiveZZZ-Git/MoonMelodies
+cd MoonMelodies
+pip install -e .                       # add ".[inference]" for the Bayesian-inference extra
 
-> **MoonMelodies note:** this fork is not published to PyPI. Install it from a clone (see *Developers* below): `pip install -e .` at the repository root. For the optional Bayesian-inference features (`PlanetProfile.Inference`) add the extra — `pip install -e ".[inference]"` — which pulls a heavy ML stack (torch, sbi, pocomc, TidalPy). The steps below describe the upstream **PlanetProfile** PyPI package.
+# 3. One-time engine setup: seeds UserConfigs/ and downloads the ~164 MB Perple_X EOS tables
+python -m PlanetProfile.install PPinstall
 
-1. (Recommended) Install all dependencies listed in the next section before proceeding.
-1. At a terminal:
-`python -m pip install PlanetProfile`
-Python 3.8 or higher is required, and Python 3.11 is recommended (newer version of Python have not been tested).
-A later version of PlanetProfile with Python 3.14 is in the works but not currently available..
-Pip will install dependencies, but a conda or mamba (better) environment with the prerequisites listed below is recommended.
-1. Create a directory where you'd like to store configurations and have folders for each body.
-1. Navigate into the new directory.
-1. **Run the installation script:**
-`python -m PlanetProfile.install`
-This will:
-   - Copy default configuration files to your working directory
-   - **Automatically download large Perple_X EOS data files (~164 MB) that are not shipped with PlanetProfile package**
-   
-1. Run the software with, for example:
-`python -m PlanetProfile.Main Europa`
-or
-`python -m PlanetProfile.Main path/to/PPBody.py`
-or in a Python script with
-`from PlanetProfile.Main import RunPPfile
-RunPPfile('Europa', 'PPEuropa.py')`
+# 4. Run a model
+python PlanetProfileCLI.py Europa                 # by body name
+python PlanetProfileCLI.py path/to/PPBody.py      # by input file
+```
 
-#### Developers
-1. Install all prerequisites below to a dedicated conda environment.
-Python 3.11 is required for developers.
-If you are not yet using Python 3.11, upgrade before installing prerequisites.
-1. Clone this repository.
-1. Navigate to the top-level directory of the repository.
-1. At a terminal:
-`python -m PlanetProfile.install PPinstall`
-1. Run the software with the command line interface (CLI) script, for example:
-`python PlanetProfileCLI.py Europa`
-or
-`python PlanetProfileCLI.py path/to/PPBody.py`
+Or from Python:
 
-### *For Matlab*
-  > **Note:** The MATLAB implementation is frozen and now lives under
-  > [`legacy-matlab/`](legacy-matlab/) (moved out of the repo root during cleanup).
-  > The `make install`, `config.m`, `PlanetProfile.m`, and per-body `PP<Body>.m`
-  > files referenced below are all under that directory. New development is
-  > Python-only in `PlanetProfile/`.
-  1. Download or clone this repository.
-  1. Install prerequisites below.
-  1. At a terminal: 
-  `make install`
-  Or, add everything in the top-level directory except the PlanetProfile sub-folder to the Matlab path.
-  1. In Matlab, set the current directory to the top-level directory of the downloaded repository (top PlanetProfile folder).
-  1. Run the software with `PPEuropa` in the Matlab command prompt, or by opening and running one of the files located at Body/PPBody.m (e.g. Titan/PPTitan.m).
-  
-## Prerequisites
-A simple list with install commands for Python is in the next section.
-* SeaFreeze -- see <https://github.com/Bjournaux/SeaFreeze>
-  * Python: Installed with pip: `pip install SeaFreeze`
-  * Matlab: Download the repository to Thermodynamics/SeaFreeze and add the contents to the Matlab path
-* Gibbs Seawater toolbox of TEOS-10 -- see <https://www.teos-10.org/>
-  * Python: Installed with conda via conda-forge: `conda install -c conda-forge gsw` 
-  * Matlab: Already packaged into the PlanetProfile repository along with the original license.
-* Perple_X -- see <http://www.perplex.ethz.ch/>
-  * For both Python and Matlab, Perple_X outputs are currently hosted as part of the installation, in Thermodynamics/Perple_X for Matlab and in PlanetProfile/Thermodynamics/EOSdata/Perple_X for Python. The files we use were generated with Perple_X v6.7.9.
-* TauP/ObsPy (optional) -- see <https://www.seis.sc.edu/taup/>
-  * Python: Installed with conda via conda-forge: `conda install -c conda-forge obspy`
-  * Matlab: Download mMatTauP contents into Utilities/ and add-with-subfolders to the Matlab path.
-* A working TeX/LaTeX distribution (such as TeXlive) is recommended for optimum plot labels. TeXlive is available at: <https://tug.org/texlive/acquire-netinstall.html>
-    It can also be installed using pip.
-* Reaktoro -- see <https://reaktoro.org>
-  * Python: Installed with conda: `conda install reaktoro`
-*  PyALMA3 -- see <https://github.com/drsaikirant88/PyALMA3>
-   * Python: Installed with pip: `pip install PyALMA3`
-* PlanetMag (optional) -- see <https://github.com/coreyjcochrane/PlanetMag>
-  * Matlab only: Installed following detailed instructions on the repo. 
+```python
+from PlanetProfile.Main import RunPPfile
+RunPPfile('Europa', 'PPEuropa.py')
+```
 
-### Note about SeaFreeze versions prior to v1.0.0
-If you had installed SeaFreeze before version v1.0.0, you will need to manually remove the prior installation because the new features are required.
-To do so, run the command `python -m site` and open the listed directory that ends in `site-packages`.
-Delete the files `seafreeze.py` and `SeaFreeze_Gibbs.mat` and any directories beginning with "SeaFreeze" (e.g. `SeaFreeze.egg-info`).
-Once these files have been removed, install the newer version of SeaFreeze with `pip install SeaFreeze`.
+Exact dependency pins are in [`pyproject.toml`](pyproject.toml). See the prerequisite links below for anything conda/pip can't resolve directly.
 
-## Installation of prerequisites
-### Python 
-1. Python version 3.8-3.11 must be installed, preferably via miniconda or Anaconda. Required modules can be installed in Miniconda with the following command:
-  1. `conda install numpy=2.0.2 scipy=1.16.3 matplotlib mpmath pandas`
-1. Conda-forge modules can be installed in Anaconda or Miniconda with the following command:
-  1. `conda install -c conda-forge gsw obspy spiceypy cmasher reaktoro`
-1. AFTER the above modules have been installed with conda, install SeaFreeze, and hdf5storage with the following command:
-  1. `pip install SeaFreeze hdf5storage PyALMA3`
-  1. Finally, install PlanetProfile as described above.
-  
-### Matlab
-1. Download PlanetProfile repository.
-1. Download SeaFreeze repository to PlanetProfile/Thermodynamics/SeaFreeze/ (NOT PlanetProfile/PlanetProfile/Thermodynamics).
-1. Add SeaFreeze folder and sub-folders to Matlab path.
-Some magnetic field features require use of the [SPICE toolkit through Mice](https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/MATLAB/index.html). To install Mice:
-1. Navigate to <https://naif.jpl.nasa.gov/naif/toolkit_MATLAB.html>
-1. Follow the link for your operating system and download the .zip or .tar.Z file to PlanetProfile/Utilities/spice/
-1. Unpack the archive (into PlanetProfile/Utilities/mice/)
-1. Add PlanetProfile/Utilities/mice/src/mice/ and PlanetProfile/Utilities/mice/lib/ to your Matlab path.
-1. Install necessary SPICE kernels by downloading them from <https://naif.jpl.nasa.gov/pub/naif/generic_kernels/> and placing them in PlanetProfile/Utilities/spice/. The planetary constants kernel (PCK) and leap-seconds kernel (TLS) are saved in this repository, but the generic ephemeris kernels (SPK, .bsp files) are too large for us to save here. There is one for each planet's satellites, located at <https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/>. Currently in use are:
-  1. jup365.bsp
-  1. sat441.bsp
-  1. ura111.bsp
-  1. nep095.bsp
+### Running the tests
 
-## Uninstalling
-1. In the top-level directory, run the command `python -c "from PlanetProfile.install import PPuninstall; PPuninstall()"`.
-All files named the same as the defaults will be deleted.
-If any non-default files have been added, you will be prompted whether you would like to delete them as well as the defaults.
-Empty folders will be deleted.
-Complete the uninstallation by deleting the entire directory and running the command `pip uninstall PlanetProfile`.
+```bash
+python -m PlanetProfile.BuildTest        # full physics suite (all Test/PPTest*.py bodies)
+python -m PlanetProfile.BuildTest full 5 # a single test profile
+pytest tests/                            # fast regression tests (optional)
+```
 
-## Contributing
-PlanetProfile is open source software. Please see the [LICENSE](https://github.com/vancesteven/PlanetProfile/blob/main/LICENSE) file and read the guidelines for contrbuting in [CONTRIBUTING.md](https://github.com/vancesteven/PlanetProfile/blob/main/CONTRIBUTING.md) if you are interested in joining the project. Also see our community guidelines in [CODE_OF_CONDUCT.md](https://github.com/vancesteven/PlanetProfile/blob/main/CODE_OF_CONDUCT.md).
+Adding major functionality should come with a matching `PlanetProfile/Test/PPTest#.py` body; `BuildTest` must pass before merging.
 
-## Notes
-* With the PlanetProfile 3.0 release, both Python and Matlab are available. However, the MATLAB branch does not ahve the same functionality and we do not plan to keep it up to date with the Python version. For the latest features, use the Python version.
-* With the PlanetProfile 2.0 release, both Python and Matlab are available. The two branches do not have the same functionality yet with this release--some features exist in the Python version that are not yet implemented in the Matlab.
-* As of 2020-09-28, PlanetProfile v1.1.0 was released along with code for making calculations regarding magnetic induction. The development (main) branch of PlanetProfile is set up to generate profiles from minimal inputs. Output profiles that may be used along with the induction calculations may be found in the v1.1.0 release.
-* The default settings include a recalculation of all parameters. It is recommended to recalculate all parameters whenever PlanetProfile is updated and any time a change in input parameters may affect layer thicknesses or other intermediate variables.
+---
 
-Some calculations in Python use parallel computing with the multiprocessing builtin module. There are sometimes cross-platform compatibility issues that crop up. By default, multiprocessing is enabled; disable it by setting Params.DO_PARALLEL = False in UserConfigs/configPP.py.
+## Prerequisites (the engine's scientific stack)
+
+Most of these install via the commands above; the links are for manual installs and background.
+
+- **SeaFreeze** — <https://github.com/Bjournaux/SeaFreeze> (`pip install SeaFreeze`)
+- **Gibbs Seawater (TEOS-10)** — <https://www.teos-10.org/> (`conda install -c conda-forge gsw`)
+- **Perple_X** — <http://www.perplex.ethz.ch/> — outputs are downloaded on install into the platform cache (not committed to git).
+- **Reaktoro** — <https://reaktoro.org> (`conda install -c conda-forge reaktoro`)
+- **PyALMA3** — <https://github.com/drsaikirant88/PyALMA3> (`pip install PyALMA3`)
+- **spiceypy** (NAIF CSPICE) — installed via conda-forge; SPICE kernels ship with the package.
+- **TauP/ObsPy** (optional, seismic) — <https://www.seis.sc.edu/taup/> (`conda install -c conda-forge obspy`)
+- A LaTeX distribution is **not required** — MoonMelodies renders labels with matplotlib mathtext. LaTeX is used only if it is installed.
+
+> **Parallelism.** Some calculations use Python `multiprocessing`. If you hit cross-platform issues, disable it with `Params.DO_PARALLEL = False` in `UserConfigs/configPP.py`.
+
+---
+
+## Repository layout
+
+| Path | What it is |
+|---|---|
+| `PlanetProfile/` | The scientific engine (the import package — unchanged from upstream in name and layout). |
+| `PlanetProfile/API/` | The MoonMelodies JSON API boundary (mapper, validation, schema, results, `ppworker`). |
+| `PlanetProfile/Inference/` | Bayesian interior inference (MCMC + SBI). |
+| `legacy-matlab/` | The frozen MATLAB implementation, archived (imported by nothing in Python). |
+| `backend/`, `frontend/` | Scaffolds for the planned FastAPI backend and static web UI. |
+| `docs/spec/` | The MoonMelodies spec & refactor plan. |
+| `tests/` | Regression tests. |
+| `configs/`, `data-assets/` | Configuration and data-manifest scaffolding. |
+
+### Legacy MATLAB
+
+The MATLAB implementation is **frozen** and lives under [`legacy-matlab/`](legacy-matlab/) (`config.m`, `PlanetProfile.m`, per-body `PP<Body>.m`, `make install`). It is not maintained going forward; new development is Python-only in `PlanetProfile/`.
+
+---
+
+## Contributing & license
+
+MoonMelodies is open-source under the same license as PlanetProfile — see [LICENSE](LICENSE) and [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests for the fork's tooling (API, backend, frontend, packaging) go to <https://github.com/9LiveZZZ-Git/MoonMelodies>. **Improvements to the underlying physics belong upstream** — please contribute those to [PlanetProfile](https://github.com/vancesteven/PlanetProfile) so the whole community benefits. Community guidelines are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
