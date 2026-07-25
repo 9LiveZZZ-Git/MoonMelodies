@@ -127,6 +127,25 @@ def test_reload_oceanprops_name_matches_writer():
     assert df.oceanPropsFile.endswith('_liquidOceanProps.txt')       # single source of truth
 
 
+def test_preload_eos_initializer_shares_eoslist():
+    # Deferred Phase 2 item (SetupInit.PRELOAD_EOS): preloaded EOS must reach 'spawn'
+    # workers. The Pool initializer repopulates the worker's module-global EOSlist so it
+    # reuses the preloaded EOS instead of rebuilding them.
+    try:
+        from PlanetProfile.Utilities.defineStructs import EOSlist
+        from PlanetProfile.Main import _initWorkerEOSlist
+    except Exception:
+        if pytest is not None:
+            pytest.skip('PlanetProfile not importable in this environment')
+        return
+    EOSlist.loaded.pop('pp_test_eos', None)
+    _initWorkerEOSlist({'pp_test_eos': 42}, {'pp_test_eos': 'range'})
+    assert EOSlist.loaded.get('pp_test_eos') == 42        # worker EOSlist receives the preloaded EOS
+    assert EOSlist.ranges.get('pp_test_eos') == 'range'
+    EOSlist.loaded.pop('pp_test_eos', None)
+    EOSlist.ranges.pop('pp_test_eos', None)
+
+
 if __name__ == '__main__':
     import sys
     ok = 0

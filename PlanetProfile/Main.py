@@ -30,7 +30,7 @@ from PlanetProfile.Thermodynamics.Electrical import ElecConduct
 from PlanetProfile.Thermodynamics.OceanProps import LiquidOceanPropsCalcs, WriteLiquidOceanProps
 from PlanetProfile.Thermodynamics.Seismic import SeismicCalcs, WriteSeismic
 from PlanetProfile.Thermodynamics.Viscosity import ViscosityCalcs
-from PlanetProfile.Utilities.defineStructs import Constants, FigureFilesSubstruct, PlanetStruct, Timing
+from PlanetProfile.Utilities.defineStructs import Constants, FigureFilesSubstruct, PlanetStruct, Timing, EOSlist
 from PlanetProfile.Utilities.ResultsStructs import ExplorationResultsStruct, MonteCarloResultsStruct, InductionResultsStruct
 from PlanetProfile.Utilities.SetupInit import SetupInit, SetupFilenames, SetCMR2strings, PrecomputeEOS
 from PlanetProfile.Utilities.ResultsIO import WriteResults, ReloadResultsFromPickle, ExtractResults, InductionCalced, ensure_parent_dir
@@ -49,6 +49,16 @@ if plat == 'Windows':
 else:
     mtpType = 'spawn'
 mtpContext = mtp.get_context(mtpType)
+
+
+def _initWorkerEOSlist(loaded, ranges):
+    """ Pool initializer for 'spawn' workers: repopulate this worker's module-global
+        EOSlist with the EOS objects preloaded in the parent process (PRELOAD_EOS), so
+        the worker reuses them instead of rebuilding every EOS from disk. Runs once per
+        worker, after the worker imports the package (which resets EOSlist to defaults). """
+    EOSlist.loaded.update(loaded)
+    EOSlist.ranges.update(ranges)
+
 
 # Assign logger
 log = logging.getLogger('PlanetProfile')
@@ -1469,7 +1479,35 @@ def GridPlanetProfileFunc(FuncName, PlanetGrid, Params):
     if Params.DO_PARALLEL:
         # Prevent slowdowns from competing process spawning when #cores > #jobs
         nCores = int(np.max([1, np.min([Params.maxCores, np.size(PlanetList1D), Params.threadLimit])]))
-        pool = mtpContext.Pool(nCores)
+        # Under the 'spawn' start method, each worker starts with an empty EOSlist and
+        # would rebuild every EOS. When EOS were preloaded (PRELOAD_EOS), hand the
+        # picklable ones to each worker via a Pool initializer so they are reused instead
+        # of recomputed. Reaktoro DB handles / CustomSolution EOS are excluded (not
+        # reliably picklable); if the rest cannot be pickled either, fall back cleanly.
+        pool = None
+        if Params.PRELOAD_EOS:
+            # Filter per-EOS: share every preloaded EOS that pickles (e.g. the expensive
+            # Perple_X interior tables), and skip those that do not (e.g. SeaFreeze EOS
+            # holding unpicklable lbftd state, or Reaktoro DB handles) so those are rebuilt
+            # per worker as before. This gives the speedup wherever it is safe.
+            shareEOS, shareRanges = {}, {}
+            for k, v in EOSlist.loaded.items():
+                if k in ('CustomSolutionEOS', 'ReaktoroDatabases'):
+                    continue
+                try:
+                    pickle.dumps(v)
+                except Exception:
+                    continue
+                shareEOS[k] = v
+                if k in EOSlist.ranges:
+                    shareRanges[k] = EOSlist.ranges[k]
+            if shareEOS:
+                pool = mtpContext.Pool(nCores, initializer=_initWorkerEOSlist,
+                                       initargs=(shareEOS, shareRanges))
+                log.debug(f'Sharing {len(shareEOS)} of {len(EOSlist.loaded)} preloaded EOS with the '
+                          f'{nCores} parallel workers; any that cannot be pickled are rebuilt per worker.')
+        if pool is None:
+            pool = mtpContext.Pool(nCores)
         parResult = [pool.apply_async(FuncName, (deepcopy(Planet), deepcopy(Params))) for Planet in PlanetList1D]
         pool.close()
         pool.join()
