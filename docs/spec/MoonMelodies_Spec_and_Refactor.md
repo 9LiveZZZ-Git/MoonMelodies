@@ -1,6 +1,6 @@
 # MoonMelodies — Full Specification & Refactor Plan
 
-MoonMelodies is a fork of the PlanetProfile scientific framework — a compute-heavy Python engine that builds 1D interior-structure models of icy moons and ocean worlds (ice shell → liquid ocean → silicate mantle → iron core) and derives seismic, electrical, magnetic-induction, tidal, and gravity observables. This document is a single cohesive plan for turning that engine into a maintainable, discoverable, reproducible product: it cleans up a 3.4 GB dual-language repository, fixes 22 confirmed bugs, draws a clean JSON API boundary around the unchanged physics, fronts it with a local-only Rust orchestration server backed by a warm pool of Python worker processes, and delivers a static browser UI served both same-origin from the Rust binary and from GitHub Pages. The physics stays in Python by design; Rust and the browser own only orchestration, validation, and delivery. The front matter below frames the reality of the codebase, ties the workstreams together, and sequences them into a dependency-aware roadmap; the detailed sections referenced at the end supply the specifics.
+MoonMelodies is a fork of the PlanetProfile scientific framework — a compute-heavy Python engine that builds 1D interior-structure models of icy moons and ocean worlds (ice shell → liquid ocean → silicate mantle → iron core) and derives seismic, electrical, magnetic-induction, tidal, and gravity observables. This document is a single cohesive plan for turning that engine into a maintainable, discoverable, reproducible product: it cleans up a 3.4 GB dual-language repository, fixes 22 confirmed bugs, draws a clean JSON API boundary around the unchanged physics, fronts it with a local-only **Python (FastAPI) orchestration server** backed by a warm pool of Python worker processes, and delivers a static browser UI served both same-origin from that server and from GitHub Pages. The physics stays in Python by design; the FastAPI backend and the browser own only orchestration, validation, and delivery. The front matter below frames the reality of the codebase, ties the workstreams together, and sequences them into a dependency-aware roadmap; the detailed sections referenced at the end supply the specifics.
 
 ## Reality Check
 
@@ -39,11 +39,13 @@ This section logs work completed against the plan below, and one correction to t
 
   Every run of a given model produced a byte-identical fingerprint, including the numerically involved downstream stack (PyALMA Love numbers, MoonMag induction), and the API path reproduces the engine exactly. This holds because runs no longer share mutable state (`deepcopy(configParams)` per run; the worker snapshots a pristine `Params` and re-`deepcopy`s per job) and the `EOSlist` cache is order-independent (a freshly built EOS and a reused one give identical results, verified separately). Caveats: this covered single-body runs; grid parallelism is shown deterministic separately by the `PRELOAD_EOS` fix (a parallel + preloaded-EOS grid reproduces the serial result bit-for-bit), and **MonteCarlo is intentionally stochastic** (random sampling) unless seeded.
 
+**Architecture decision (2026-07-24) — drop Rust; the backend is all-Python (FastAPI).** The orchestration server will be a local **FastAPI + uvicorn** app, not a Rust/axum one. Rationale: Rust was only ever going to do orchestration, validation, HTTP/JSON, static-serving, and security — *never* physics (every EOS/geophysics dependency is native C/C++/Fortran with no Rust **or** JS/WASM equivalent). Rust's one real advantage, a single self-contained server binary, evaporates here because the workers are Python, so a Python environment must ship regardless. The orchestration layer is I/O- and subprocess-bound, not throughput-bound (jobs run seconds-to-hours), so Rust's speed is irrelevant to a single-user loopback tool. Going all-Python means one language end-to-end for a Python-native team, a simpler build (`pip`, no second toolchain or cross-compilation), and — critically — **direct reuse of the Phase 3 `PlanetProfile/API/` modules**: `validate.py` becomes the request validator (optionally behind Pydantic), `schema.py` powers `GET /schema` (and FastAPI's OpenAPI), `results.py`/`mapper.py` are unchanged, and the FastAPI app supervises a warm pool of the existing `ppworker.py` processes. **What does not change:** the entire API *contract* is language-agnostic and stands exactly as written below — the endpoints, request/result JSON shapes (§3.1–3.3), the JSONL worker protocol (§3.2), SSE progress (§4), and the loopback/token/CORS/PNA security model (§3.6, §5). Only the implementation technology is swapped (axum→FastAPI, tokio→asyncio, Cargo workspace→a small module set inside/beside `PlanetProfile/API/`, `cargo run`→`uvicorn`). Section 5 has been retitled and its Rust-specific scaffolding (framework choice, Cargo layout, build-and-run) replaced accordingly; where any older prose still mentions Rust/axum/tokio/crates, read it as the FastAPI/uvicorn/asyncio equivalent — the behavior specified is identical. The browser still computes nothing: Pyodide/WASM cannot host Reaktoro/CSPICE/PyALMA3 and the 164 MB tables, so the frontend stays a thin client that renders returned arrays and talks to `http://127.0.0.1:<PORT>`.
+
 **Follow-ups this surfaced (fold into the phases below):**
 
 - **Structure-grid caches are download-on-demand.** The inference forward model interpolates precomputed structure-grid `.pkl` caches (10s of MB, Git-LFS in the Space) instead of running full PlanetProfile per sample. Teach `install.py` / the Inference cache-loader to fetch these on demand, the same pattern used for the 164 MB Perple_X tables — do **not** commit them to git.
 - **Runtime notes.** `torch` needs `KMP_DUPLICATE_LIB_OK=TRUE` on macOS (OpenMP duplicate-lib); inference must run from a working directory that has no `PlanetProfile/` subdirectory (a cwd-relative cache path otherwise shadows the package as a namespace package).
-- **Wiring for the new stack.** The 10 generators are a standalone library with no caller in the module (the Streamlit app drives them ad hoc). The Rust backend should own the orchestration: run the inference job, stream progress, and expose each figure; the frontend requests them. For live/interactive views, prefer **client-side rendering of the returned arrays** (see §4/§6) over server PNGs.
+- **Wiring for the new stack.** The 10 generators are a standalone library with no caller in the module (the Streamlit app drives them ad hoc). The FastAPI backend should own the orchestration: run the inference job, stream progress, and expose each figure; the frontend requests them. For live/interactive views, prefer **client-side rendering of the returned arrays** (see §4/§6) over server PNGs.
 - **Still deferred from Phase 1:** de-vendor MoonMag (BuildTest-gated), the git-history purge of large binaries (destructive — needs a coordinated force-push), and the packaging-identity rebrand to MoonMelodies (coupled to `PPversion.py` + a reinstall).
 
 ## Current State in One Page
@@ -53,19 +55,19 @@ This section logs work completed against the plan below, and one correction to t
 - **Two god-structs.** Nearly all state lives in `PlanetProfile/Utilities/defineStructs.py`: `PlanetStruct` (with `Bulk`/`Ocean`/`Sil`/`Core`/`Do`/`Steps`/`Seismic`/`Magnetic`/`Gravity` substructs) and `ParamsStruct`. `Params` is a mutable global.
 - **The pipeline.** Input `PP<Body>.py` builds a `PlanetStruct`; `Main.py` orchestrates setup, layer propagation, and the observable modules; results are written to per-body output folders under long encoded filenames.
 - **Config system.** `defaultConfig*.py` templates are copied into `UserConfigs/config*.py` on first run and then override defaults (loaded via `GetConfig.py` / `__init__.py`). First import triggers an interactive stdin prompt and a silent ~164 MB Perple_X EOS download.
-- **Heavy scientific dependencies with no Rust equivalents.** SeaFreeze, gsw (TEOS-10), Perple_X EOS tables, Reaktoro, PyALMA3, MoonMag, spiceypy (SPICE kernels), hdf5storage, numpy/scipy, matplotlib, and Python `multiprocessing` (spawn context).
+- **Heavy scientific dependencies with no non-Python equivalents** (neither Rust nor JS/WASM). SeaFreeze, gsw (TEOS-10), Perple_X EOS tables, Reaktoro, PyALMA3, MoonMag, spiceypy (SPICE kernels), hdf5storage, numpy/scipy, matplotlib, and Python `multiprocessing` (spawn context) — this is what forces the compute to stay in Python, on the machine, behind a thin orchestration layer.
 - **UX today.** CLI plus raw-Python file editing. The central physical constraint — *exactly two of three of `Tb_K`, `zb_km`, `wOcean_ppt`* — exists only as a code comment and fails deep in the pipeline. There is no input validation, no run manifest, and a confusing `CALC_NEW` reload model.
 
 ## How the Workstreams Fit Together
 
-The workstreams form a dependency chain, not a set of parallel tracks. **Folder cleanup comes first** because everything else is easier to reason about — and safer to move — once the live engine is separated from the frozen MATLAB tree and the vendored copies. **Bug-fixes run alongside cleanup and API work**, slotting in wherever they touch a file already being modified: correctness fixes in `Main.py`, `SetupInit.py`, `Seismic.py`, and the CLI harden the engine *before* it is wrapped, so the API boundary is drawn over code that behaves. **API-ification** introduces a thin JSON harness (`ppworker.py`) that builds `PlanetStruct` from declarative JSON via a whitelist mapper — never importing a user `PP` file — giving the engine a stable, validated contract without rewriting physics. **The Rust backend** then orchestrates a warm pool of these workers behind an HTTP/JSON API bound to loopback only. **The UI** consumes that same contract, and the **GitHub-Pages HTML frontend** is the same static bundle shipped twice: embedded in the Rust binary (same-origin, zero-friction) and published to Pages (a shareable convenience that health-probes the local backend).
+The workstreams form a dependency chain, not a set of parallel tracks. **Folder cleanup comes first** because everything else is easier to reason about — and safer to move — once the live engine is separated from the frozen MATLAB tree and the vendored copies. **Bug-fixes run alongside cleanup and API work**, slotting in wherever they touch a file already being modified: correctness fixes in `Main.py`, `SetupInit.py`, `Seismic.py`, and the CLI harden the engine *before* it is wrapped, so the API boundary is drawn over code that behaves. **API-ification** introduces a thin JSON harness (`ppworker.py`) that builds `PlanetStruct` from declarative JSON via a whitelist mapper — never importing a user `PP` file — giving the engine a stable, validated contract without rewriting physics. **The FastAPI backend** then orchestrates a warm pool of these workers behind an HTTP/JSON API bound to loopback only. **The UI** consumes that same contract, and the **GitHub-Pages HTML frontend** is the same static bundle shipped twice: served same-origin by the backend itself (zero-friction) and published to Pages (a shareable convenience that health-probes the local backend).
 
 ```mermaid
 flowchart TD
     A["Phase 0–1: Repo & Folder Cleanup<br/>separate live engine from frozen MATLAB,<br/>de-vendor, purge git binaries"] --> B["Engine API-ification<br/>ppworker.py JSON harness +<br/>whitelist PlanetStruct mapper"]
     BUGS["22 Bug-Fixes<br/>Main.py / SetupInit.py / Seismic.py / CLI"] -.slot into.-> A
     BUGS -.slot into.-> B
-    B --> C["Local Rust Backend (axum)<br/>warm worker pool,<br/>bind 127.0.0.1/::1, validation, SSE"]
+    B --> C["Local Python Backend (FastAPI/uvicorn)<br/>warm worker pool,<br/>bind 127.0.0.1/::1, validation, SSE"]
     C --> D["UI Structure & UX<br/>validated forms, constraint widget,<br/>tabbed results, exploration modes"]
     D --> E["GitHub-Pages Static HTML Frontend<br/>Vite+TS+Preact SPA, served twice:<br/>embedded same-origin + Pages copy"]
     C -->|embeds & serves| E
@@ -73,7 +75,7 @@ flowchart TD
 
 ## Phased Roadmap
 
-Sequencing is strictly dependency-aware: stabilize and reorganize the engine first, then draw the API boundary, then build Rust, then the frontend. Each cleanup phase is independently BuildTest-green.
+Sequencing is strictly dependency-aware: stabilize and reorganize the engine first, then draw the API boundary, then build the Python (FastAPI) backend, then the frontend. Each cleanup phase is independently BuildTest-green.
 
 | Phase | Goal | Key Deliverables | Exit Criteria |
 |---|---|---|---|
@@ -81,18 +83,18 @@ Sequencing is strictly dependency-aware: stabilize and reorganize the engine fir
 | **1 — Repo Cleanup** | Shrink and organize the 3.4 GB tree without disturbing the live package | Ordered low-risk migration: strays first → bulk `git mv` of frozen MATLAB → de-vendor MoonMag (only package-touching step, gated on BuildTest) → git-history rewrite to purge 170 large binaries → packaging identity into 8-area target tree | Each step BuildTest-green; `PlanetProfile/` internals (`Default/`, `Test/`, `SPICE/`, `EOStables/`, import name) unmoved |
 | **2 — Bug-Fix Sweep** | Clear the remaining confirmed defects | Fix the remaining ~19 bugs (reload filename/glob errors, worker-count and EOS-cache issues, De Morgan inversion, CLI list-vs-scalar comparisons, mutation-by-aliasing) with regression tests | All 22 confirmed bugs closed; new tests guard each; BuildTest + reproducibility hold |
 | **3 — API Boundary** | Give the engine a declarative JSON contract | `ppworker.py` thin JSON harness; whitelist JSON→`PlanetStruct` mapper (no `importlib` of user files); jobdir/`os.chdir` isolation; `SKIP_PLOTS` default; result + manifest schema (single / exploreogram / inductogram / montecarlo / reload) | A worker builds a body from JSON and returns `result.json` + manifest matching a CLI run bit-for-bit |
-| **4 — Rust Backend** | Local-only orchestration over a warm worker pool | axum server (bind 127.0.0.1/::1 + startup token); worker pool (import-once, one job in-flight); full API (`/health`, `/bodies`, `/schema`, `/runs`, SSE `/events`, `/result`, `/artifacts`, cancel); up-front 422 validation incl. two-of-three rule and EOS-table allowlist | All endpoints pass integration tests; cancel = kill+respawn; concurrency/grid/wall-clock/body-size caps enforced |
-| **5 — UI & UX** | Discoverable, validated browser workflow | Seven grouped, unit-labeled form sections; hydrosphere constraint-mode widget; run submission with SSE progress; tabbed results with client-side replot; ExploreOgram / InductOgram / MonteCarlo modes | UI drives a full single-body run and one grid mode end-to-end against the Rust backend |
-| **6 — Frontend Delivery** | Ship the SPA and publish | Vite + TS + Preact bundle; uPlot 1D profiles + lazy 2D ogram renderer; embedded same-origin serve from Rust binary; GitHub-Pages copy with loopback health-probe, CORS + Private-Network-Access handling, and graceful Safari fallback | Same bundle works same-origin from `127.0.0.1:PORT` and from the Pages copy; PNGs are opt-in download-only artifacts |
+| **4 — Python (FastAPI) Backend** | Local-only orchestration over a warm worker pool | FastAPI/uvicorn server (bind 127.0.0.1/::1 + startup token); asyncio-supervised worker pool of `ppworker.py` processes (import-once, one job in-flight); full API (`/health`, `/bodies`, `/schema`, `/runs`, SSE `/events`, `/result`, `/artifacts`, cancel); up-front 422 validation reusing Phase 3 `validate.py`/`schema.py` (two-of-three rule, EOS-table allowlist) | All endpoints pass integration tests; cancel = kill+respawn; concurrency/grid/wall-clock/body-size caps enforced |
+| **5 — UI & UX** | Discoverable, validated browser workflow | Seven grouped, unit-labeled form sections; hydrosphere constraint-mode widget; run submission with SSE progress; tabbed results with client-side replot; ExploreOgram / InductOgram / MonteCarlo modes | UI drives a full single-body run and one grid mode end-to-end against the FastAPI backend |
+| **6 — Frontend Delivery** | Ship the SPA and publish | Vite + TS + Preact bundle; uPlot 1D profiles + lazy 2D ogram renderer; same-origin serve from the FastAPI backend (StaticFiles); GitHub-Pages copy with loopback health-probe, CORS + Private-Network-Access handling, and graceful Safari fallback | Same bundle works same-origin from `127.0.0.1:PORT` and from the Pages copy; PNGs are opt-in download-only artifacts |
 
 ## Risk Register
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Physics-in-Rust proves infeasible** | Certain | High | Do not attempt it. Every EOS/geophysics dependency is native C/C++/Fortran with no Rust equivalent; Rust owns only orchestration, validation, and delivery, and the Python engine stays unchanged behind a JSON harness. |
-| **Mixed-content / loopback call blocked by the browser** | Medium | High | HTTP-to-loopback from an HTTPS page is *not* mixed-content-blocked in Chrome/Edge/Firefox (loopback is a potentially-trustworthy secure context), but Safari is stricter and CORS + Private-Network-Access still apply. Guaranteed fallback: Rust also serves the same bundle same-origin at `127.0.0.1:PORT`; the Pages copy is a convenience that degrades gracefully. |
+| **Physics cannot leave Python** (rules out Rust *and* in-browser compute) | Certain | High | Do not attempt it in any other language. Every EOS/geophysics dependency (SeaFreeze, Perple_X, Reaktoro C++, PyALMA3, CSPICE, gsw) is native C/C++/Fortran with no Rust or JS/WASM equivalent, and needs 164 MB of tables + real multiprocessing. This is *why* the backend is thin Python orchestration (FastAPI) over the unchanged engine, and *why* the browser renders but never computes. It also retired the Rust option: since the workers must be Python, a Python runtime ships regardless, erasing Rust's single-binary advantage. |
+| **Mixed-content / loopback call blocked by the browser** | Medium | High | HTTP-to-loopback from an HTTPS page is *not* mixed-content-blocked in Chrome/Edge/Firefox (loopback is a potentially-trustworthy secure context), but Safari is stricter and CORS + Private-Network-Access still apply. Guaranteed fallback: the FastAPI backend also serves the same bundle same-origin at `127.0.0.1:PORT` (StaticFiles); the Pages copy is a convenience that degrades gracefully. |
 | **Packaging breakage during file moves** | Medium | High | Phase the migration so each step is independently BuildTest-green; keep `PlanetProfile/` internals and the import name fixed (packaging globs, importlib-by-path, `install.py`, and BuildTest hard-depend on them); gate the single package-touching step (de-vendoring MoonMag) on BuildTest. |
-| **Python multiprocessing misbehaves under a long-lived server** | Medium | Medium | Do not run the CLI per request. Warm worker pool with one job in-flight per worker (engine is non-reentrant: global mutable `Params` + `EOSlist`); apply overrides onto a pristine deepcopy per job; native crash kills only one worker, and cancel = kill+respawn. Reject PyO3 (a native-dep crash would take down the whole server). |
+| **Python multiprocessing misbehaves under a long-lived server** | Medium | Medium | Do not run the CLI per request. Warm worker pool with one job in-flight per worker (engine is non-reentrant: global mutable `Params` + `EOSlist`); apply overrides onto a pristine deepcopy per job; native crash kills only one worker, and cancel = kill+respawn. Keep workers as separate subprocesses, never imported into the FastAPI process (a native-dep segfault would otherwise take down the whole server). |
 | **Loss of scientific reproducibility** | Medium | High | Preserve the `PP<Body>` input model and the four run modes; require bit-for-bit reproduction against pre-refactor outputs as an exit criterion for every phase; add regression tests for each bug fix; pin numpy/scipy and EOS-table versions; emit a run manifest so every result is traceable to its inputs. |
 
 ## Document Contents
@@ -103,7 +105,7 @@ The sections that follow, in order:
 - **Repository & Folder-Structure Cleanup** — categorized inventory, 8-area target tree, and the ordered low-risk migration.
 - **Target Architecture & Interface Contract** — the full stack, worker-pool invocation model, API endpoints, and validation rules.
 - **UI Structure & UX Design** — information architecture, form sections, constraint widget, results workspace, and exploration modes.
-- **Local Rust Backend Specification** — axum server, worker protocol, job registry, SSE, security/CORS, and build-and-run.
+- **Local Python (FastAPI) Backend Specification** — FastAPI/uvicorn server, worker protocol, job registry, SSE, security/CORS, and run procedure.
 - **GitHub-Pages Static HTML Frontend** — the dual-serve SPA, client-side rendering, and browser-security handling.
 - **Confirmed Bug Register** — the 22 verified defects with locations, severities, and fixes.
 
@@ -134,7 +136,7 @@ Severity scale used throughout:
 The intended happy path (README.md:40-61) is five bullet points. The real path has far more failure surface.
 
 #### A1. Install the scientific stack — **P1**
-The pip line `python -m pip install PlanetProfile` (README.md:43) hides a stack of heavyweight compiled/native dependencies with no Rust or pure-Python fallback: SeaFreeze, gsw/TEOS-10 (compiled C), Reaktoro (C++), spiceypy (NAIF CSPICE), hdf5storage (libhdf5), PyALMA3, MoonMag, plus numpy/scipy/matplotlib/mpmath. In practice a scientist must hand-assemble a conda environment (README.md:113-121). The instructions are **internally contradictory**: README.md:116 says `conda install numpy=1.26.4 scipy=1.16.3`, while `pyproject.toml:34-47` pins `numpy>=2.0,<3` and `scipy>=1.16.3,<1.17`. A user who follows the README verbatim can build an environment the package refuses to run in.
+The pip line `python -m pip install PlanetProfile` (README.md:43) hides a stack of heavyweight compiled/native dependencies with no pure-Python fallback: SeaFreeze, gsw/TEOS-10 (compiled C), Reaktoro (C++), spiceypy (NAIF CSPICE), hdf5storage (libhdf5), PyALMA3, MoonMag, plus numpy/scipy/matplotlib/mpmath. In practice a scientist must hand-assemble a conda environment (README.md:113-121). The instructions are **internally contradictory**: README.md:116 says `conda install numpy=1.26.4 scipy=1.16.3`, while `pyproject.toml:34-47` pins `numpy>=2.0,<3` and `scipy>=1.16.3,<1.17`. A user who follows the README verbatim can build an environment the package refuses to run in.
 - **Footgun:** Python is pinned to 3.8–3.11 (3.11 recommended; README.md:44-45 explicitly warns newer Python is untested). A scientist on a modern default interpreter (3.12+) silently installs into an unsupported runtime.
 
 #### A2. Create a working directory and run the installer — **P2**
@@ -241,7 +243,7 @@ The test harness is `python -m PlanetProfile.BuildTest` over `PlanetProfile/Test
 
 ### D. Target user workflow the new UI must enable
 
-The redesign is effectively greenfield on the interface side (no web/UI/Rust exists today). The target is a **static HTML/JS frontend on GitHub Pages talking to a local Rust backend** that drives the unmodified Python engine as isolated subprocesses. The workflow it must deliver:
+The redesign is effectively greenfield on the interface side (no web/UI/backend exists today). The target is a **static HTML/JS frontend on GitHub Pages talking to a local Python (FastAPI) backend** that drives the unmodified Python engine as isolated subprocesses. The workflow it must deliver:
 
 1. **Zero-friction start.** The user opens a page and picks a body from a dropdown populated from the 19 `Default/<Body>/` models. No terminal, no `cd`, no `input()` prompt. The backend has already pre-seeded `UserConfigs/`, SPICE kernels, and the Perple_X cache once, headlessly, so the engine imports cleanly. Install health (EOS cache complete? SPICE present?) is surfaced as a status check, not discovered at runtime.
 
@@ -305,7 +307,7 @@ The repo is 3.4 GB on disk (working tree ~2.6 GB, `.git` 769 MB), 1,402 tracked 
 | **G. Brand / non-code assets** | `misc/` — `PPQRcode.pdf` (1.1 MB), `PPQRcode_NPS.pdf` (914 KB), `PPlogo.{ico,pdf,png,svg}`, `PPlogoDocs.png` | 2.1 MB | Belongs under `assets/`, not the repo root. |
 | **H. Packaging / build identity** | `pyproject.toml` (name `PlanetProfile` v3.1.5, `vancesteven` URLs, `package-data "*" = ["*.txt","*.tab","*.mat",…]`), `MANIFEST.in`, `makefile` (MATLAB-oriented, detects `/Applications/MATLAB*`) | — | Still identifies as upstream, not the fork; the wildcard `package-data` is *why* large binaries can ship in the wheel; `makefile` drives the frozen MATLAB flow. |
 
-**Greenfield note:** there is no `backend/`, `frontend/`, Rust, or web layer anywhere — those directories are net-new, so their placement is a free choice with no migration risk.
+**Greenfield note:** there is no `backend/`, `frontend/`, or web layer anywhere — those directories are net-new, so their placement is a free choice with no migration risk.
 
 ---
 
@@ -328,8 +330,8 @@ MoonMelodies/
 │   ├── Gravity/  Plotting/  Utilities/  Inversion/  MonteCarlo/  CustomSolution/  TrajecAnalysis/
 │   └── ...
 │
-├── backend/                       # (NEW) Rust orchestration server (job queue → drives Python engine as subprocesses)
-│   ├── Cargo.toml  src/           # HTTP/WebSocket API, per-job working-dir lifecycle, JSON⇄PlanetStruct bridge
+├── backend/                       # (NEW) FastAPI orchestration server (job queue → drives Python engine as subprocesses)
+│   ├── run.py + server/          # FastAPI app: HTTP/SSE API, per-job working-dir lifecycle, JSON⇄PlanetStruct bridge
 │   └── worker/                    # thin Python worker script the server shells out to (builds PlanetStruct from JSON)
 │
 ├── frontend/                      # (NEW) static HTML/JS for GitHub Pages; talks to LOCAL backend over HTTP
@@ -470,9 +472,9 @@ Commit: `build(packaging): rebrand distribution to MoonMelodies, scope package-d
 
 This section defines the end-to-end contract that unifies the new stack:
 
-> **Static HTML/JS (GitHub Pages, HTTPS) ⇄ HTTP/JSON ⇄ local Rust server (127.0.0.1) ⇄ Python PlanetProfile engine.**
+> **Static HTML/JS (GitHub Pages, HTTPS) ⇄ HTTP/JSON ⇄ local FastAPI server (127.0.0.1) ⇄ Python PlanetProfile engine.**
 
-It is prescriptive: the Rust, HTML, and engine-wrapper work streams must conform to the endpoints, JSON shapes, invocation protocol, and security rules below.
+It is prescriptive: the backend, frontend, and engine-wrapper work streams must conform to the endpoints, JSON shapes, invocation protocol, and security rules below.
 
 ---
 
@@ -481,11 +483,11 @@ It is prescriptive: the Rust, HTML, and engine-wrapper work streams must conform
 ```mermaid
 flowchart TB
   subgraph Browser["Browser (user's machine)"]
-    UI["Static HTML/JS SPA<br/>served from GitHub Pages (HTTPS)<br/>or from the Rust binary (loopback)"]
+    UI["Static HTML/JS SPA<br/>served from GitHub Pages (HTTPS)<br/>or from the FastAPI backend (loopback)"]
   end
 
   subgraph Host["Local machine — loopback only"]
-    subgraph Rust["Rust server  (bind 127.0.0.1 / ::1)"]
+    subgraph Backend["FastAPI server  (bind 127.0.0.1 / ::1)"]
       HTTP["HTTP/JSON + SSE API<br/>CORS + PNA + token guard"]
       Q["Job queue + registry<br/>(id -> state, jobdir, manifest)"]
       POOL["Worker pool manager<br/>(N warm workers, respawn on crash)"]
@@ -512,17 +514,17 @@ flowchart TB
   UI -. "same-origin static assets (fallback)" .- STATIC
 ```
 
-Every physics dependency (SeaFreeze, gsw/TEOS-10, Reaktoro, Perple_X tables, PyALMA3, MoonMag, spiceypy) stays inside the Python worker. Rust orchestrates; the browser renders. No physics runs in Rust or in the browser.
+Every physics dependency (SeaFreeze, gsw/TEOS-10, Reaktoro, Perple_X tables, PyALMA3, MoonMag, spiceypy) stays inside the Python worker. The FastAPI backend orchestrates; the browser renders. No physics runs in the backend or in the browser.
 
 ---
 
-### 2. How the Rust server invokes the Python engine
+### 2. How the FastAPI server invokes the Python engine
 
-**Decision: (b) a Rust-managed pool of long-lived "warm" Python worker processes**, each running a **new thin JSON harness `ppworker.py`** (not the existing CLI), exchanging newline-delimited JSON (JSONL) over stdin/stdout.
+**Decision: (b) a backend-managed pool of long-lived "warm" Python worker processes**, each running the thin JSON harness `ppworker.py` (not the existing CLI), exchanging newline-delimited JSON (JSONL) over stdin/stdout. (The harness was built in Phase 3; the FastAPI backend supervises a pool of them.)
 
 #### 2.1 The worker protocol
 
-Worker lifecycle (started and supervised by Rust):
+Worker lifecycle (started and supervised by the backend):
 
 1. **Startup (once per worker):** cwd is a server-owned config root that already contains a seeded `UserConfigs/`, so `import PlanetProfile` does **not** hit the interactive `input()` prompt (`__init__.py:74-78`). The worker pays the heavy import cost — SPICE `furnsh`, config assembly in `GetConfig.py`, MoonMag/Reaktoro import — exactly once, and optionally calls `PrecomputeEOS` to warm the process-global `EOSlist` interpolators. It snapshots a pristine `deepcopy` of the global `Params`.
 2. **Loop:** block reading one JSONL job on stdin:
@@ -533,15 +535,15 @@ Worker lifecycle (started and supervised by Rust):
    - terminal: `{"type":"result","id":"...","status":"succeeded","summary":{...},"manifest":{...}}` or `{"type":"result","status":"failed","error":{"code":"...","message":"...","stage":"..."}}`.
    Bulky arrays go to `result.json` on disk (path in the manifest); only scalar `summary` + manifest travel back through the pipe. Raw Python logs go to stderr for debugging.
 
-**One job in-flight per worker.** The engine mutates a module-global `Params` and a process-global `EOSlist` and is not reentrant, so a single interpreter can safely run only one model at a time. Server concurrency = number of workers ≈ CPU cores. Grid jobs (ExploreOgram/InductOgram/MonteCarlo) internally use the engine's own `spawn` multiprocessing, so Rust hands a grid job a whole worker and lets it fan out.
+**One job in-flight per worker.** The engine mutates a module-global `Params` and a process-global `EOSlist` and is not reentrant, so a single interpreter can safely run only one model at a time. Server concurrency = number of workers ≈ CPU cores. Grid jobs (ExploreOgram/InductOgram/MonteCarlo) internally use the engine's own `spawn` multiprocessing, so the backend hands a grid job a whole worker and lets it fan out.
 
 #### 2.2 Why this option, versus the alternatives
 
 | Option | Verdict | Rationale |
 |---|---|---|
-| **(b) Warm worker pool + JSON harness** ✅ chosen | **Recommended** | Amortizes the expensive one-time import + 164 MB Perple_X/EOS load across many jobs (the dominant cost). Process isolation contains crashes in native deps (Reaktoro C++, CSPICE, libhdf5) — a bad job kills only its worker, which Rust respawns. Declarative JSON input eliminates arbitrary code execution. Matches the engine's existing process-level concurrency assumption. |
+| **(b) Warm worker pool + JSON harness** ✅ chosen | **Recommended** | Amortizes the expensive one-time import + 164 MB Perple_X/EOS load across many jobs (the dominant cost). Process isolation contains crashes in native deps (Reaktoro C++, CSPICE, libhdf5) — a bad job kills only its worker, which the backend respawns. Declarative JSON input eliminates arbitrary code execution. Matches the engine's existing process-level concurrency assumption. |
 | (a) Cold subprocess per job (JSON via temp files) | Fallback only | Correct and simple, but re-pays the multi-second heavy import on **every** job. Acceptable as a degraded fallback when the pool is unhealthy; wasteful as the steady state. |
-| (c) PyO3 embedding | Rejected (for now) | One embedded CPython + GIL cannot run two models concurrently given global mutable `Params`/`EOSlist`; the engine relies on `spawn` multiprocessing that re-imports the world in children; and a segfault in a C/C++/Fortran dependency would take down the whole Rust server. Revisit only as a micro-optimization — unnecessary since jobs are seconds-to-minutes, not microseconds. |
+| (c) In-process engine (import PlanetProfile into the FastAPI process) | Rejected | One in-process CPython + the GIL cannot run two models concurrently given global mutable `Params`/`EOSlist`; the engine relies on `spawn` multiprocessing that re-imports the world in children; and a segfault in a C/C++/Fortran dependency would take down the whole server. Keep the engine in separate worker subprocesses. Revisit only as a micro-optimization — unnecessary since jobs are seconds-to-minutes, not microseconds. |
 | (d) Shell `python -m PlanetProfile.Main <Body>` | Rejected | Re-pays import cold every job; parses argv by fragile substring sniffing; loads models by `importlib`-ing `PP<Body>.py` (**arbitrary code execution**); and emits brittle positional `.txt` we would have to re-parse. The harness `ppworker.py` bypasses all four problems. |
 
 **Mandatory one-time bootstrap** (before the server accepts traffic): run `python -m PlanetProfile.install` in the server data dir to seed `UserConfigs/` (defeats the import-time stdin prompt) and download the Perple_X cache into the platformdirs user cache, shared read-only across all workers.
@@ -594,7 +596,7 @@ Base URL: `http://127.0.0.1:<PORT>` (default e.g. `31415`). All bodies and respo
 }
 ```
 
-`explore` is present only when `mode ∈ {exploreogram, inductogram, montecarlo}`. **Validation the Rust layer enforces before touching a worker (HTTP 422 with field-level errors):**
+`explore` is present only when `mode ∈ {exploreogram, inductogram, montecarlo}`. **Validation the backend enforces before touching a worker (HTTP 422 with field-level errors), reusing Phase 3 `validate.py`:**
 
 1. Exactly **two of three** of `bulk.Tb_K`, `bulk.zb_km`, `ocean.wOcean_ppt` set when H2O is present (`defineStructs.py:79`).
 2. `do.NO_H2O` requires `bulk.qSurf_Wm2`.
@@ -653,7 +655,7 @@ Base URL: `http://127.0.0.1:<PORT>` (default e.g. `31415`). All bodies and respo
 ### 4. Async job model, progress, and figures
 
 - **Submit → run:** `POST /runs` validates, assigns an id, enqueues, and returns `202`. State machine: `queued → running → succeeded | failed | canceled`.
-- **Progress streaming: Server-Sent Events** at `GET /runs/{id}/events` (chosen over WebSocket — unidirectional, trivially CORS-compatible, native `EventSource`, no upgrade handshake). The Rust server relays the worker's JSONL progress: pipeline `stage` for single runs (`setup → ice → ocean → inner → elec → seismic → viscosity → induction → gravity → write`), and `{completed,total,percent}` for grids (derived from `Planet.index`/`Params.nModels`, which `PrintCompletion` already computes). Terminal event carries the final status; the client then `GET`s `/result`.
+- **Progress streaming: Server-Sent Events** at `GET /runs/{id}/events` (chosen over WebSocket — unidirectional, trivially CORS-compatible, native `EventSource`, no upgrade handshake). The FastAPI server relays the worker's JSONL progress: pipeline `stage` for single runs (`setup → ice → ocean → inner → elec → seismic → viscosity → induction → gravity → write`), and `{completed,total,percent}` for grids (derived from `Planet.index`/`Params.nModels`, which `PrintCompletion` already computes). Terminal event carries the final status; the client then `GET`s `/result`.
 - **Cancellation:** `DELETE /runs/{id}` sends SIGTERM→SIGKILL to the owning worker (a job monopolizes one worker, so the kill is clean), marks the job `canceled`, and respawns a fresh warm worker.
 - **Artifacts:** written by the engine into the isolated `jobdir/<Body>/…` (profile `.txt`, `_mantleCore.txt`, `_liquidOceanProps.txt`, `_gravityParameters.txt`, `_AxiSEM.bm`, `.pkl`, `.mat`, and `figures/*.png`). Enumerated by `GET /runs/{id}/artifacts`, downloaded via `/artifacts/{name}`.
 
@@ -669,13 +671,13 @@ Base URL: `http://127.0.0.1:<PORT>` (default e.g. `31415`). All bodies and respo
 The frontend is served over **HTTPS** from `https://<user>.github.io/...`; the backend lives at `http://127.0.0.1:<PORT>`. Three browser mechanisms interact:
 
 1. **Mixed content — NOT a blocker for loopback.** `http://127.0.0.1`, `http://localhost`, and `http://[::1]` are on the "potentially trustworthy" list (secure contexts), so an HTTPS page issuing `fetch`/`EventSource` to loopback HTTP is **not** blocked as mixed content in Chrome, Edge, and Firefox. (Safari is stricter and may block; treat it as the caveat browser.)
-2. **CORS — required.** The Pages origin (`https://<user>.github.io`) ≠ the backend origin, so every request is cross-origin. The Rust server **must** answer `OPTIONS` preflight and set `Access-Control-Allow-Origin: https://<user>.github.io` (echo the specific allowlisted origin), `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers: Authorization`. Do **not** use `*` if credentials are ever added; we use a bearer token in a header, not cookies, so an explicit allowlist is both safe and correct.
-3. **Private / Local Network Access (PNA/LNA) — emerging preflight.** Chrome is rolling out a requirement that a public/secure context reaching a private/loopback address send `Access-Control-Request-Private-Network: true` and receive `Access-Control-Allow-Private-Network: true`, gated behind a one-time user permission prompt ("this site wants to access devices on your local network"). The Rust server **must** include `Access-Control-Allow-Private-Network: true` on preflight responses.
+2. **CORS — required.** The Pages origin (`https://<user>.github.io`) ≠ the backend origin, so every request is cross-origin. The FastAPI server **must** answer `OPTIONS` preflight and set `Access-Control-Allow-Origin: https://<user>.github.io` (echo the specific allowlisted origin), `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers: Authorization`. Do **not** use `*` if credentials are ever added; we use a bearer token in a header, not cookies, so an explicit allowlist is both safe and correct.
+3. **Private / Local Network Access (PNA/LNA) — emerging preflight.** Chrome is rolling out a requirement that a public/secure context reaching a private/loopback address send `Access-Control-Request-Private-Network: true` and receive `Access-Control-Allow-Private-Network: true`, gated behind a one-time user permission prompt ("this site wants to access devices on your local network"). The FastAPI server **must** include `Access-Control-Allow-Private-Network: true` on preflight responses.
 
 **Concrete, workable options (ship both):**
 
 - **Primary — HTTPS Pages page → loopback backend with CORS + PNA headers.** Works today in Chrome/Edge/Firefox; the user approves the LNA prompt once. Zero-install for the frontend.
-- **Guaranteed fallback / packaged mode — the Rust binary also serves the identical static bundle** at `http://127.0.0.1:<PORT>`. Then page origin == backend origin: **no CORS, no mixed content, no PNA**, and it works offline and in Safari. The GitHub Pages deployment becomes a convenience mirror of the same bundle.
+- **Guaranteed fallback / packaged mode — the FastAPI backend also serves the identical static bundle** at `http://127.0.0.1:<PORT>`. Then page origin == backend origin: **no CORS, no mixed content, no PNA**, and it works offline and in Safari. The GitHub Pages deployment becomes a convenience mirror of the same bundle.
 
 The frontend health-probes `GET /health` on the loopback port at load; if absent, it shows install/run instructions instead of failing silently. Browser flags / manual exceptions are explicitly **not** part of the contract (fragile, per-user).
 
@@ -696,9 +698,9 @@ The frontend health-probes `GET /health` on the loopback port at load; if absent
 
 ## 4. UI Structure & UX Design
 
-> **Summary.** Defines the information architecture, screen flow, component hierarchy, and client state model for the MoonMelodies static web frontend that drives the local Rust server (which runs the Python PlanetProfile engine via a warm worker pool). It maps the PlanetStruct input model (Bulk/Ocean/Sil/Core/Do/Steps) into seven grouped, unit-labeled, validated form sections built around a "hydrosphere constraint mode" widget that enforces the exactly-two-of-three {Tb_K, zb_km, wOcean_ppt} rule, then specifies run submission with SSE progress, a tabbed results workspace that replots layer arrays client-side (server PNGs opt-in only), and the ExploreOgram/InductOgram/MonteCarlo exploration modes. Everything is kept consistent with the API contract (GET /bodies, /schema, POST /runs, SSE /events, /result, /artifacts) and the loopback-security model.
+> **Summary.** Defines the information architecture, screen flow, component hierarchy, and client state model for the MoonMelodies static web frontend that drives the local FastAPI server (which runs the Python PlanetProfile engine via a warm worker pool). It maps the PlanetStruct input model (Bulk/Ocean/Sil/Core/Do/Steps) into seven grouped, unit-labeled, validated form sections built around a "hydrosphere constraint mode" widget that enforces the exactly-two-of-three {Tb_K, zb_km, wOcean_ppt} rule, then specifies run submission with SSE progress, a tabbed results workspace that replots layer arrays client-side (server PNGs opt-in only), and the ExploreOgram/InductOgram/MonteCarlo exploration modes. Everything is kept consistent with the API contract (GET /bodies, /schema, POST /runs, SSE /events, /result, /artifacts) and the loopback-security model.
 
-This section designs the information architecture and screen flow for the MoonMelodies web app: a **static HTML/JS bundle** (served both from GitHub Pages and, as the guaranteed same-origin fallback, from the Rust server at `127.0.0.1:PORT`) that lets a scientist configure, run, and interpret 1‑D interior-structure models. The frontend is a thin client: **all physics stays in the Python engine**, driven by the local Rust server over HTTP/JSON per the shared API contract. The UI never executes user `PP<Body>.py` code; every model is a declarative JSON request built from validated form fields.
+This section designs the information architecture and screen flow for the MoonMelodies web app: a **static HTML/JS bundle** (served both from GitHub Pages and, as the guaranteed same-origin fallback, from the FastAPI server at `127.0.0.1:PORT`) that lets a scientist configure, run, and interpret 1‑D interior-structure models. The frontend is a thin client: **all physics stays in the Python engine**, driven by the local FastAPI server over HTTP/JSON per the shared API contract. The UI never executes user `PP<Body>.py` code; every model is a declarative JSON request built from validated form fields.
 
 ### 1. Design goals
 
@@ -775,7 +777,7 @@ uiStore           { activeArea, activeResultTab, comparisonSet:[id...],
 
 Key rules:
 - **`draftStore` is the single source of truth for a request** and serializes 1:1 to the API request body (io-recon shape A). Nothing derived/output ever lives here.
-- **Validation is dual.** The client mirrors the Rust 422 rules for instant feedback (`draftStore._validation`), but the **Rust server is authoritative** — a 422 response is merged back into `byField`. This avoids drift while keeping the form responsive.
+- **Validation is dual.** The client mirrors the backend 422 rules for instant feedback (`draftStore._validation`), but the **FastAPI server is authoritative** — a 422 response is merged back into `byField`. This avoids drift while keeping the form responsive.
 - **`schemaStore` is fetched once on connect** (`GET /schema` + `/schema/{body}` on body selection) and cached; it is the source of truth for units, ranges, enum members, field docs, and the phase legend. No enum or default is hardcoded in the frontend.
 - **`runsStore` persists** to `localStorage` (ids + last-known status) so the runs library survives reloads; results are re-fetched lazily from `GET /runs/{id}/result`.
 
@@ -856,9 +858,9 @@ App
 **Purpose.** The frontend cannot function without the local server (browsers cannot run the physics). On load it health-probes the loopback endpoint.
 
 - **Behavior.** Probe `GET http://127.0.0.1:PORT/health` with the startup token (read from a value the user pastes once, or from a same-origin config when served from loopback). Two deployment origins are supported and detected automatically:
-  - *Same-origin (recommended):* bundle served by Rust at `127.0.0.1:PORT` → zero CORS/mixed-content/PNA friction.
+  - *Same-origin (recommended):* bundle served by the backend at `127.0.0.1:PORT` → zero CORS/mixed-content/PNA friction.
   - *GitHub Pages (cross-origin):* HTTPS page → http loopback is a potentially-trustworthy secure context (not mixed-content-blocked in Chrome/Edge/Firefox; Safari stricter). Requires Rust to echo the Pages origin in CORS and send `Access-Control-Allow-Private-Network: true`.
-- **States.** `probing` (spinner) → `connected` (show workers + engine version in the ConnectionStatusChip) or `absent` → render **SetupHelp**: copy-paste commands to (1) `python -m PlanetProfile.install` (seeds `UserConfigs/`, kills the import stdin prompt, downloads the 164 MB Perple_X cache) and (2) start the Rust server; a "Retry" button re-probes. A Safari-specific note recommends the loopback-served origin.
+- **States.** `probing` (spinner) → `connected` (show workers + engine version in the ConnectionStatusChip) or `absent` → render **SetupHelp**: copy-paste commands to (1) `python -m PlanetProfile.install` (seeds `UserConfigs/`, kills the import stdin prompt, downloads the 164 MB Perple_X cache) and (2) start the FastAPI server; a "Retry" button re-probes. A Safari-specific note recommends the loopback-served origin.
 - **Token.** Every request carries the random startup token; the gate stores it in `connectionStore` (session only). A 401 sends the user back to the gate.
 
 #### 5.2 Body Picker
@@ -905,7 +907,7 @@ Selecting a mode auto-sets the corresponding `Do` toggles, enables exactly the t
 - `comp = CustomSolution*` → reveals `pH` and the Reaktoro note (slower first run); `comp = none` → disables salinity.
 - `ConstantProps.Inner = true` → reveals `Sil.rhoSilWithCore_kgm3` and relaxes MoI matching (advisory note).
 
-**Validation & feedback.** `ValidationSummaryPanel` lists blocking errors and non-blocking warnings with jump-to-field links, mirroring the Rust 422 rules:
+**Validation & feedback.** `ValidationSummaryPanel` lists blocking errors and non-blocking warnings with jump-to-field links, mirroring the backend 422 rules:
 1. exactly two of {`Tb_K`, `zb_km`, `wOcean_ppt`} pinned (enforced structurally by the widget);
 2. `NO_H2O` ⇒ `qSurf_Wm2` set;
 3. `ocean.comp` ∈ enum;
@@ -998,9 +1000,11 @@ This IA turns the current edit-Python-then-run-CLI workflow into a guided, valid
 ---
 
 
-## 5. Local Rust Backend Specification
+## 5. Local Python (FastAPI) Backend Specification
 
-> **Summary.** Specifies a local-only Rust HTTP/JSON server (axum) that fronts the unchanged PlanetProfile Python engine through a pool of warm worker processes running a new thin JSON harness (ppworker.py). It defines the Cargo workspace layout, every endpoint handler in the shared API contract, the tokio job registry with SSE progress and kill-and-respawn cancellation, the newline-delimited JSON worker protocol with native-crash-tolerant error propagation, jobdir-scoped artifact serving, security/CORS/Private-Network handling, and a concrete build-and-run procedure. The physics stays in Python because every EOS/geophysics dependency is native C/C++/Fortran with no Rust equivalent; Rust owns only orchestration, validation, and delivery.
+> **Note (2026-07-24):** the backend is **FastAPI + uvicorn**, not Rust — see the Architecture Decision in the front matter. This section originally specified a Rust/axum server; the **contract** it defines (endpoints, the JSONL worker protocol, SSE progress, artifact serving, and the security model) is language-agnostic and stands unchanged. Only the implementation scaffolding is restated below in Python terms. Any residual Rust identifier (axum/tokio/cargo/`mm-*` crate/`.rs`) should be read as its FastAPI/asyncio/`pip`/`PlanetProfile.API` equivalent.
+
+> **Summary.** Specifies a local-only **FastAPI** HTTP/JSON server (run by **uvicorn**) that fronts the unchanged PlanetProfile Python engine through a pool of warm worker processes running the Phase 3 thin JSON harness (`ppworker.py`). It defines the module layout (a thin app over the existing `PlanetProfile/API/` package), every endpoint in the shared API contract, an asyncio job registry with SSE progress and kill-and-respawn cancellation, the newline-delimited JSON worker protocol with native-crash-tolerant error propagation, jobdir-scoped artifact serving, security/CORS/Private-Network handling, and a concrete run procedure. The physics stays in Python because every EOS/geophysics dependency is native C/C++/Fortran with no non-Python equivalent; the server owns only orchestration, validation, and delivery.
 
 The backend is a **local-only orchestration server**. It never re-implements physics: it validates declarative JSON requests, schedules them onto a pool of warm Python worker processes that embed the existing `PlanetProfile` engine, streams progress, and serves the resulting data + artifacts to the static frontend. It binds `127.0.0.1`/`::1` exclusively and is designed to be started by the same user who runs the science code, on the same machine.
 
@@ -1009,7 +1013,7 @@ flowchart LR
   subgraph Browser["Static frontend (GitHub Pages HTTPS  OR  loopback same-origin)"]
     UI[HTML/JS UI]
   end
-  subgraph Rust["Rust server — axum, binds 127.0.0.1/::1 only"]
+  subgraph Backend["FastAPI server — uvicorn, binds 127.0.0.1/::1 only"]
     API[HTTP/JSON + SSE handlers]
     REG[Job registry + queue]
     SUP[Worker-pool supervisor]
@@ -1034,84 +1038,68 @@ flowchart LR
 
 ---
 
-#### 1. Framework choice: `axum` (recommended over `actix-web`)
+#### 1. Framework choice: `FastAPI` on `uvicorn` (asyncio)
 
-Use **`axum`** on the **`tokio`** runtime.
+Use **FastAPI** served by **uvicorn** (a single async worker — the concurrency comes from the Python worker *pool*, not from multiple server processes).
 
-| Requirement in the contract | Why axum fits |
+| Requirement in the contract | Why FastAPI fits |
 | --- | --- |
-| Long-lived worker child processes supervised concurrently with HTTP | `tokio::process::Child` + `tokio` tasks are the native async model; axum *is* a tower/tokio service, so supervision and serving share one runtime with no bridging. |
-| SSE progress stream (`GET /runs/{id}/events`) | `axum::response::sse::{Sse, Event}` is first-class; a `tokio::sync::broadcast` receiver maps directly to an SSE `Stream`. |
-| CORS + preflight + `Access-Control-Allow-Private-Network` | `tower-http::cors::CorsLayer` handles the allowlist/OPTIONS; the PNA header is added with a tiny `map_response` layer. Reusable tower middleware stack. |
-| Static bundle hosting for the loopback same-origin fallback | `tower-http::services::ServeDir` mounts the frontend under the same origin with one line. |
-| JSON request/result DTOs | `serde` + `axum::Json` extractor/response; validation returns `422` via a typed rejection. |
-| Structured request + per-job logging | `tower-http::TraceLayer` + `tracing`/`tracing-subscriber`. |
+| Long-lived worker child processes supervised concurrently with HTTP | `asyncio.create_subprocess_exec` + tasks run the pool in the same event loop that serves HTTP — one runtime, no bridging. |
+| SSE progress stream (`GET /runs/{id}/events`) | Return a `StreamingResponse` with `media_type="text/event-stream"` fed by an `asyncio.Queue`/broadcast per job. (`sse-starlette` provides a tidy `EventSourceResponse` if preferred.) |
+| CORS + preflight + `Access-Control-Allow-Private-Network` | `CORSMiddleware` handles the allowlist/OPTIONS; the PNA header is added by a one-line middleware on preflight responses. |
+| Static bundle hosting for the loopback same-origin fallback | `app.mount("/", StaticFiles(directory=..., html=True))` serves the frontend under the same origin. |
+| JSON request/result DTOs + validation | Pydantic models validate the request and return `422` with field errors automatically; or call the Phase 3 `validate.py` directly. The `GET /schema` payload comes from `schema.py`, and FastAPI also emits OpenAPI for free. |
+| Structured request + per-job logging | standard `logging` + a request-id middleware. |
 
-`actix-web` is a viable alternative and slightly faster in synthetic benchmarks, but it historically carried its own actor runtime and middleware idioms; for a workload that is **I/O- and subprocess-bound (not request-throughput-bound)**, axum's tighter tokio/tower integration and simpler SSE + child-process story win. Raw HTTP throughput is irrelevant here — every request fans out to a multi-second-to-multi-hour Python job.
+FastAPI is the natural fit because the whole stack is already Python and the perf-critical work is native/subprocess, not HTTP throughput — every request fans out to a multi-second-to-multi-hour Python job, so raw routing speed is irrelevant. Flask + a thread pool would also work; FastAPI wins on native async (subprocess supervision + SSE in one loop) and free schema/OpenAPI.
 
-Core crate set: `axum`, `tokio` (`rt-multi-thread`, `process`, `macros`, `sync`, `signal`), `tower`, `tower-http` (`cors`, `fs`, `trace`), `serde`/`serde_json`, `uuid` (v4), `tokio-util` (`CancellationToken`), `tracing`/`tracing-subscriber`, `clap` (CLI/config), `thiserror`/`anyhow`, `time`, `rand` (startup token).
+Dependency set (add to the `[backend]` extra): `fastapi`, `uvicorn[standard]`, `pydantic` (v2), optionally `sse-starlette`. Everything else — the engine, the mapper, validation, schema, results, and the worker — is already in `PlanetProfile/API/` from Phase 3.
 
 ---
 
-#### 2. Project layout (Cargo workspace)
+#### 2. Project layout (thin FastAPI app over the Phase 3 API package)
 
-A new top-level `backend/` directory (per the target tree in recon), organized as a workspace so the pure DTO/validation logic is testable without the server, and the frontend + Python harness live beside the Rust that drives them.
+Because Phase 3 already delivered the schema/validation/mapper/results/worker as Python modules in `PlanetProfile/API/`, the "backend" collapses to a **small FastAPI app plus a pool supervisor and a job registry**. What in the Rust plan was a four-crate Cargo workspace is, in Python, ~3 new files that import the existing package. A new top-level `backend/` holds the app + frontend + config; the reusable logic stays inside `PlanetProfile/API/` so it ships and unit-tests with the engine.
 
 ```
-backend/
-├── Cargo.toml                  # [workspace] members
-├── crates/
-│   ├── mm-schema/              # lib: DTOs + validation + phase legend + enums
-│   │   └── src/
-│   │       ├── request.rs      # RunRequest, Do, Bulk, Ocean, Sil, Core, Steps, Explore… (io-recon A)
-│   │       ├── result.rs       # RunResult, GridResult, Summary, Layers… (io-recon B/C)
-│   │       ├── enums.rs        # bodies, Ocean.comp, exploreType/z-enum, mantleEOS/coreEOS allowlist
-│   │       ├── validate.rs     # exactly-two-of-three, NO_H2O⇒qSurf, enum + path-traversal checks
-│   │       └── lib.rs
-│   ├── mm-worker/              # lib: worker process wrapper + JSONL protocol + pool supervisor
-│   │   └── src/
-│   │       ├── proto.rs        # JobSpec (out), WorkerMsg {Progress,Result,Error,Ready} (in)
-│   │       ├── worker.rs       # one child: spawn, write job, read framed lines, health
-│   │       ├── pool.rs         # N workers, free-list, dispatch, kill+respawn
-│   │       └── lib.rs
-│   ├── mm-jobs/                # lib: job registry, state machine, jobdir lifecycle, manifest
-│   │   └── src/
-│   │       ├── registry.rs     # Arc<RwLock<HashMap<Uuid, Job>>> + queue channel
-│   │       ├── job.rs          # Job{status, events tx, result, cancel token, jobdir}
-│   │       ├── manifest.rs     # artifact manifest read/serve guard
-│   │       └── lib.rs
-│   └── mm-server/              # bin: axum app, routing, handlers, CORS/PNA, static host, config
-│       └── src/
-│           ├── main.rs         # config load, bootstrap check, build pool, bind, serve
-│           ├── config.rs       # clap + TOML + env → ServerConfig
-│           ├── router.rs       # all routes + middleware stack + security layers
-│           ├── handlers/
-│           │   ├── meta.rs     # /health /bodies /schema /schema/{body}
-│           │   ├── runs.rs     # POST /runs, GET /runs/{id}, /result, DELETE /runs/{id}
-│           │   ├── events.rs   # GET /runs/{id}/events  (SSE)
-│           │   └── artifacts.rs# /runs/{id}/artifacts , /artifacts/{name}
-│           └── security.rs     # Origin/Host check, startup-token guard
-├── python/
-│   └── ppworker.py             # NEW thin JSON harness (the only new Python file)
-├── frontend/                   # static bundle (served by Pages AND by Rust at loopback)
+PlanetProfile/API/          # (EXISTS from Phase 3 — reused as-is by the backend)
+├── mapper.py               #   JSON⇄PlanetStruct whitelist mapper
+├── validate.py             #   two-of-three, NO_H2O⇒qSurf, enums, EOS-table allowlist
+├── schema.py               #   GET /schema payload (input schema, output dict, enums)
+├── results.py              #   result.json serializer + build_manifest()
+├── ppworker.py             #   JSONL stdin/stdout worker harness (one job in-flight)
+├── pool.py                 #   (NEW) asyncio pool: N warm ppworker subprocesses, dispatch, kill+respawn
+└── server/                 #   (NEW) the FastAPI app
+    ├── app.py              #     FastAPI() instance, CORS+PNA middleware, StaticFiles mount, lifespan(pool)
+    ├── registry.py         #     {id → Job{status, jobdir, event queue, result, cancel}} + asyncio queue
+    ├── routes_meta.py      #     GET /health /bodies /schema /schema/{body}
+    ├── routes_runs.py      #     POST /runs, GET /runs/{id}, /result, DELETE /runs/{id}
+    ├── routes_events.py    #     GET /runs/{id}/events  (SSE via StreamingResponse)
+    ├── routes_artifacts.py #     GET /runs/{id}/artifacts , /artifacts/{name} (manifest-guarded)
+    ├── security.py         #     Origin/Host allowlist + startup-token dependency
+    └── config.py           #     env/CLI → ServerConfig (port, origins, caps, N workers)
+
+backend/                    # (NEW, top-level)
+├── run.py                  #   entrypoint: bootstrap check → uvicorn.run(app)  (or `python -m PlanetProfile.API.server`)
+├── frontend/               #   static bundle (served by Pages AND same-origin by StaticFiles)
 └── config/
-    └── moonmelodies.toml       # default server config
+    └── moonmelodies.toml   #   default server config
 ```
 
-`mm-schema` has **no** dependency on `axum`/`tokio` — it is plain `serde` + validation, unit-testable in isolation and re-usable to emit the `/schema` payload the frontend consumes.
+`validate.py`/`schema.py` have **no** web dependency — they are plain Python, unit-tested in isolation (Phase 3), and re-used both to enforce `422` and to emit the `/schema` payload the frontend consumes. This is the concrete payoff of the all-Python decision: the backend is a thin routing/supervision shell, not a second codebase.
 
 ---
 
 #### 3. Endpoint handlers (the API contract)
 
-All JSON. Every request passes the security middleware (§7) first. Routes are mounted in `mm-server/src/router.rs`.
+All JSON. Every request passes the security middleware (§7) first. Routes are mounted in `PlanetProfile/API/server/app.py`.
 
 | Method + path | Handler | Behavior |
 | --- | --- | --- |
 | `GET /health` | `meta::health` | `200 {"status":"ok","workers":{"total":N,"idle":k,"busy":m},"engineReady":true,"version":…}`. Frontend health-probes this to decide loopback-vs-Pages and to show setup help if the server/engine is absent. |
 | `GET /bodies` | `meta::bodies` | Lists the 19 bodies discovered under `PlanetProfile/Default/*/` at startup (cached). `[{"name":"Europa","hasInductOgram":true,"hasExplore":true}, …]`. |
 | `GET /schema` | `meta::schema` | Returns the canonical field dictionary (name, unit, dtype, description, required, enum) for `RunRequest`, the mode enum, the `exploreType`/z-enum lists, and the phase-ID legend (`0=ocean,1–6=ice I–VI,30=clathrate,50=silicate,100/105=Fe,110/115=FeS`). This is the single source of truth the UI renders its form from. |
-| `GET /schema/{body}` | `meta::schema_body` | Per-body **defaults** (the values a `PP<Body>.py` would set) so the form pre-fills. Defaults are fetched from a warm worker via a `defaults` job kind (worker builds the default `PlanetStruct` and serializes its input fields) — never by importing the PP file into Rust. |
+| `GET /schema/{body}` | `meta::schema_body` | Per-body **defaults** (the values a `PP<Body>.py` would set) so the form pre-fills. Defaults are produced by `mapper.planet_to_spec` on a worker (build the default `PlanetStruct`, serialize its input fields) — never by importing the PP file into the server. |
 | `POST /runs` | `runs::submit` | Validates the body (§below). On success: create `Uuid`, create `jobdir`, register job as `queued`, enqueue, return **`202 {"id":…,"status":"queued"}`** with `Location: /runs/{id}`. On validation failure: **`422 {"errors":[{"field":…,"message":…}]}`**. |
 | `GET /runs/{id}` | `runs::status` | `{"id":…,"status":"queued|running|succeeded|failed|canceled","mode":…,"stage":…,"progress":{"completed":n,"total":m},"summary":{…}?}`. `summary` (scalar block from io-recon B) is inlined once available so a UI can show headline numbers before fetching full arrays. `404` if unknown. |
 | `GET /runs/{id}/events` | `events::stream` | **SSE.** Emits `event: progress` (pipeline stage for single; `completed/total` for grids), `event: status` on transitions, and a terminal `event: done` / `event: error`, then closes. Backed by a per-job `broadcast::Receiver`; late subscribers get a replay of the last known state first. |
@@ -1131,26 +1119,29 @@ All JSON. Every request passes the security middleware (§7) first. Routes are m
 
 ---
 
-#### 4. Async job model (tokio)
+#### 4. Async job model (asyncio)
 
-**Registry.** `Arc<RwLock<HashMap<Uuid, Arc<Job>>>>`. A `Job` holds: `status: Mutex<JobStatus>`, `events: broadcast::Sender<Event>` (progress/status fan-out to any number of SSE subscribers), `result: OnceCell<ResultOrError>`, `cancel: CancellationToken`, `jobdir: PathBuf`, `mode`, timestamps.
+**Registry.** A `dict[str, Job]` guarded by an `asyncio.Lock`. A `Job` holds: `status`, `events: asyncio.Queue` (progress/status fan-out to SSE subscribers — or a small broadcast helper for multiple readers), `result`, `cancel: asyncio.Event`, `jobdir: Path`, `mode`, timestamps.
 
-**Queue + dispatch.** A bounded `tokio::sync::mpsc` channel is the pending queue (`POST /runs` pushes the job id). A single **dispatcher task** loops: `rx.recv()` a job id → `pool.acquire().await` a free worker (this awaits when all N are busy, giving natural backpressure = concurrency cap) → spawn a **per-job task** that (a) marks `running`, (b) drives the worker to completion or cancellation, (c) marks terminal, (d) returns the worker to the pool (or respawns on crash/cancel).
+**Queue + dispatch.** An `asyncio.Queue` is the pending queue (`POST /runs` puts the job id). A single **dispatcher task** (started in the app `lifespan`) loops: `await queue.get()` a job id → `await pool.acquire()` a free worker (this awaits when all N are busy, giving natural backpressure = concurrency cap) → create a **per-job task** that (a) marks `running`, (b) drives the worker to completion or cancellation, (c) marks terminal, (d) returns the worker to the pool (or respawns on crash/cancel).
 
-**One job per worker** — matches the engine's non-reentrant global `Params`/`EOSlist`. Concurrency = number of idle workers; there is no second job inside a worker ever.
+**One job per worker** — matches the engine's non-reentrant global `Params`/`EOSlist`. Concurrency = number of idle workers; there is never a second job inside a worker.
 
-**Per-job task core (select over three futures):**
-```rust
-tokio::select! {
-    outcome = worker.run_job(&spec, &job.events) => { /* Ok(manifest) | Err(kind) */ }
-    _ = job.cancel.cancelled()            => { worker.kill().await; /* → canceled, respawn */ }
-    _ = tokio::time::sleep(wall_clock_cap)=> { worker.kill().await; /* → failed(timeout) */ }
-}
+**Per-job core (race the job against cancel and a wall-clock cap):**
+```python
+try:
+    manifest = await asyncio.wait_for(
+        worker.run_job(spec, job.events, cancel=job.cancel),   # resolves on worker 'result'
+        timeout=wall_clock_cap)
+except asyncio.TimeoutError:
+    await worker.kill()          # → failed(timeout), respawn
+except Cancelled:
+    await worker.kill()          # → canceled, respawn
 ```
 
-**Cancellation semantics.** Because a running job may be blocked inside a native C/C++/Fortran call (Reaktoro, gsw, SPICE), the only reliable stop is `Child::kill()`; the supervisor then `spawn`s a replacement worker so pool capacity is restored. Queued jobs cancel synchronously.
+**Cancellation semantics.** Because a running job may be blocked inside a native C/C++/Fortran call (Reaktoro, gsw, SPICE), the only reliable stop is killing the child process (`proc.kill()`); the supervisor then spawns a replacement worker so pool capacity is restored. Queued jobs cancel synchronously.
 
-**Timeouts & caps** (all configurable): per-job wall-clock, max concurrent = worker count, max grid cells, max request body, max jobdir bytes (reject/evict). A background reaper deletes jobdirs older than a TTL.
+**Timeouts & caps** (all configurable): per-job wall-clock, max concurrent = worker count, max grid cells, max request body, max jobdir bytes (reject/evict). A background reaper task deletes jobdirs older than a TTL.
 
 **State machine:** `queued → running → succeeded | failed | canceled`. Transitions publish a `status` SSE event and update the registry entry.
 
@@ -1158,7 +1149,7 @@ tokio::select! {
 
 #### 5. How it invokes Python (chosen strategy: warm worker pool)
 
-This is the crux and follows the contract exactly: **not** the CLI, **not** PyO3, **not** a cold `python -m PlanetProfile.Main` per job.
+This is the crux and follows the contract exactly: **not** the CLI, **not** an in-process import of the engine, **not** a cold `python -m PlanetProfile.Main` per job.
 
 ##### 5.1 The worker: `python/ppworker.py` (new, thin, ~200 lines)
 
@@ -1179,14 +1170,14 @@ Progress is reported by lightweight instrumentation: for `single`, the worker br
 
 ##### 5.2 Worker protocol (newline-delimited JSON / JSONL)
 
-One JSON object per line, `\n`-framed, over the child's stdin/stdout. stderr is captured verbatim into the server log under the job's tracing span.
+One JSON object per line, `\n`-framed, over the child's stdin/stdout. stderr is captured verbatim into the server log under the job's log context.
 
-**Rust → worker (one line):**
+**Backend → worker (one line):**
 ```json
 {"jobId":"…","mode":"single","jobdir":"/…/runs/<uuid>","wantFigures":false,"request":{ …io-recon A… }}
 ```
 
-**Worker → Rust (many lines):**
+**Worker → backend (many lines):**
 ```json
 {"type":"ready","pid":41234}
 {"type":"progress","jobId":"…","stage":"IceLayers"}
@@ -1198,18 +1189,18 @@ or, on failure that the Python layer caught:
 {"type":"error","jobId":"…","errorKind":"validation|physics|internal","message":"…","traceback":"…"}
 ```
 
-The Rust `mm-worker` reads the child's stdout with `tokio::io::BufReader::lines()`, deserializes each line into `WorkerMsg`, forwards `Progress` into the job's `broadcast` sender (→ SSE), and resolves the job on `Result`/`Error`.
+The backend's `pool.py` reads the child's stdout line-by-line (`async for line in proc.stdout`), parses each line as JSON, forwards `progress` messages into the job's event queue (→ SSE), and resolves the job on the terminal `result`.
 
-##### 5.3 Error propagation (native-crash tolerant — the reason PyO3 was rejected)
+##### 5.3 Error propagation (native-crash tolerant — the reason the engine runs out-of-process)
 
 Three failure tiers, all mapped to `failed` without taking down the server:
 1. **Caught Python exception** → worker emits `{"type":"error",…}`; job → `failed` with `errorKind` + message (+ traceback in logs). Worker stays alive and returns to the pool.
-2. **Worker process dies** (segfault from Reaktoro/gsw/SPICE, OOM, or `kill` on timeout/cancel) → Rust sees stdout EOF + non-zero/`signal` exit; job → `failed` (or `canceled`); supervisor **respawns** a replacement worker to restore capacity. A crash is contained to one job, never the server — precisely what an in-process PyO3 embedding could not guarantee.
+2. **Worker process dies** (segfault from Reaktoro/gsw/SPICE, OOM, or `kill` on timeout/cancel) → the backend sees stdout EOF + non-zero/`signal` exit; job → `failed` (or `canceled`); the pool **respawns** a replacement worker to restore capacity. A crash is contained to one job, never the server — precisely what importing the engine into the FastAPI process could not guarantee.
 3. **Protocol desync / unparseable line** → treat as a worker fault: kill + respawn, job → `failed(internal)`.
 
 ##### 5.4 Bootstrap (once, before serving)
 
-`mm-server` on startup verifies the engine is installed; if not, it runs (or instructs the user to run) `python -m PlanetProfile.install` to (a) seed `UserConfigs/` — which **eliminates the interactive `input()` prompt** at `PlanetProfile/__init__.py:75` that would otherwise hang a worker on stdin — and (b) download the 164 MB Perple_X cache shared read-only across workers. The server refuses to accept `/runs` until at least one worker has emitted `ready`.
+The server on startup verifies the engine is installed; if not, it runs (or instructs the user to run) `python -m PlanetProfile.install` to (a) seed `UserConfigs/` — which **eliminates the interactive `input()` prompt** at `PlanetProfile/__init__.py:75` that would otherwise hang a worker on stdin — and (b) download the 164 MB Perple_X cache shared read-only across workers. The server refuses to accept `/runs` until at least one worker has emitted `ready`.
 
 ---
 
@@ -1244,84 +1235,72 @@ Three failure tiers, all mapped to `failed` without taking down the server:
 - **Host-header check** (DNS-rebinding defense): accept only `localhost`/`127.0.0.1`/`[::1]` Host values.
 - **Startup token**: the server prints a random token at launch (and the loopback bundle embeds it); every API request must carry it (`Authorization: Bearer <token>` or `?token=`). Blocks other local processes/pages from driving the server.
 - **No code execution from inputs** (whitelist mapper only); **EOS-table allowlist**; artifact serving jobdir-scoped.
-- **Same-origin fallback (the guarantee).** Rust also serves the **identical static frontend bundle** at `http://127.0.0.1:PORT/` via `ServeDir`. When the user opens *that*, there is zero CORS / mixed-content / PNA surface. The frontend health-probes loopback on load: if reachable it can use the local origin directly; if the user is on the Pages URL and loopback is down, it shows setup instructions.
+- **Same-origin fallback (the guarantee).** The backend also serves the **identical static frontend bundle** at `http://127.0.0.1:PORT/` via `StaticFiles`. When the user opens *that*, there is zero CORS / mixed-content / PNA surface. The frontend health-probes loopback on load: if reachable it can use the local origin directly; if the user is on the Pages URL and loopback is down, it shows setup instructions.
 
-**Logging/observability.** `tracing` + `tracing-subscriber` (JSON or pretty). `tower-http::TraceLayer` logs each request; every job runs inside a `tracing::span!(job_id=…)` so worker stderr, stage progress, and outcome are correlated. `/health` exposes pool occupancy for a UI status pill.
+**Logging/observability.** Standard `logging` (JSON or pretty via a handler). A request-id middleware logs each request; every job logs under its `job_id` so worker stderr, stage progress, and outcome are correlated. `/health` exposes pool occupancy for a UI status pill.
 
 ---
 
 #### 8. Illustrative code sketch
 
-**Rust — `POST /runs` handler + driving a worker (abridged):**
-```rust
-// crates/mm-server/src/handlers/runs.rs
-pub async fn submit(
-    State(app): State<AppState>,
-    Json(req): Json<RunRequest>,
-) -> Result<(StatusCode, Json<SubmitResp>), ApiError> {
-    mm_schema::validate(&req).map_err(ApiError::unprocessable)?;   // 422 on failure
+**FastAPI — `POST /runs` handler + driving a worker (abridged):**
+```python
+# PlanetProfile/API/server/routes_runs.py
+from fastapi import APIRouter, Depends, HTTPException
+from PlanetProfile.API import validate
 
-    let id = Uuid::new_v4();
-    let jobdir = app.data_dir.join("runs").join(id.to_string());
-    tokio::fs::create_dir_all(&jobdir).await?;
+router = APIRouter()
 
-    let job = Arc::new(Job::new(id, req.mode, jobdir.clone()));    // queued
-    app.registry.write().await.insert(id, job.clone());
-    app.queue.send(id).await.map_err(|_| ApiError::overloaded())?; // backpressure
+@router.post("/runs", status_code=202)
+async def submit(req: dict, app=Depends(get_app), _=Depends(require_token)):
+    errors = validate.validate_request(req)                     # Phase 3 rules
+    if errors:
+        raise HTTPException(422, detail=errors)                 # field-level 422
+    job = await app.registry.create(mode=req.get("mode", "single"))  # queued, mints jobdir
+    await app.queue.put(job.id)                                 # backpressure via bounded queue
+    return {"id": job.id, "status": "queued",
+            "links": {"events": f"/runs/{job.id}/events", "result": f"/runs/{job.id}/result"}}
 
-    Ok((StatusCode::ACCEPTED, Json(SubmitResp { id, status: "queued" })))
-}
-
-// crates/mm-worker/src/worker.rs  — one job on one warm child
-impl Worker {
-    pub async fn run_job(&mut self, spec: &JobSpec, events: &broadcast::Sender<Event>)
-        -> Result<Vec<Artifact>, WorkerError>
-    {
-        let line = serde_json::to_string(spec)? + "\n";
-        self.stdin.write_all(line.as_bytes()).await?;             // hand off the job
-        self.stdin.flush().await?;
-
-        while let Some(line) = self.stdout.next_line().await? {    // read framed JSONL
-            match serde_json::from_str::<WorkerMsg>(&line)? {
-                WorkerMsg::Progress(p) => { let _ = events.send(Event::progress(p)); }
-                WorkerMsg::Result { manifest, .. } => return Ok(manifest),
-                WorkerMsg::Error(e)  => return Err(WorkerError::Python(e)),
-                WorkerMsg::Ready { .. } => {}                      // ignore mid-job
-            }
-        }
-        Err(WorkerError::Crashed)   // EOF before terminal msg → caller respawns
-    }
-}
+# PlanetProfile/API/pool.py — one job on one warm child (asyncio)
+async def run_job(self, worker, spec, events):
+    worker.stdin.write((json.dumps({"type": "job", **spec}) + "\n").encode())
+    await worker.stdin.drain()                                  # hand off the job
+    async for line in worker.stdout:                            # read framed JSONL
+        msg = json.loads(line)
+        if msg["type"] == "progress":  await events.put(msg)    # → SSE
+        elif msg["type"] == "result":  return msg               # succeeded/invalid + manifest
+    raise WorkerCrashed()                                       # EOF before terminal msg → respawn
 ```
 
-**Python — `ppworker.py` (abridged skeleton):**
+**Python — `ppworker.py` (already implemented in Phase 3; skeleton shown):**
 ```python
 import sys, os, json
 from copy import deepcopy
-from PlanetProfile.Main import PlanetProfile           # imported ONCE per process
+from PlanetProfile.Main import PlanetProfile              # imported ONCE per process
 from PlanetProfile.GetConfig import Params as baseParams
-from mm_harness import build_planet, apply_overrides, serialize_result, write_manifest
+from PlanetProfile.API import mapper, results             # Phase 3 modules
 
-def emit(obj): sys.stdout.write(json.dumps(obj) + "\n"); sys.stdout.flush()
+# stdout is kept a pristine JSON channel; engine chatter is redirected to stderr.
+def emit(obj): _REAL_STDOUT.write(json.dumps(obj) + "\n"); _REAL_STDOUT.flush()
 
 emit({"type": "ready", "pid": os.getpid()})
-for raw in sys.stdin:                                    # one job per line, forever
-    spec = json.loads(raw)
+for raw in sys.stdin:                                     # one job per line, forever
+    msg = json.loads(raw); spec = msg["spec"]
     try:
-        os.chdir(spec["jobdir"])
-        Params = apply_overrides(deepcopy(baseParams), spec)   # SKIP_PLOTS etc.
-        Planet = build_planet(spec["request"])                 # WHITELIST map, no importlib
-        emit({"type": "progress", "jobId": spec["jobId"], "stage": "SetupInit"})
-        Planet, Params = PlanetProfile(Planet, Params)         # the unchanged engine
-        serialize_result(Planet, Params, "result.json")        # arrays→lists, complex→{re,im}
-        manifest = write_manifest(Params, "manifest.json")
-        emit({"type": "result", "jobId": spec["jobId"],
-              "status": "succeeded", "resultPath": "result.json", "manifest": manifest})
+        os.chdir(msg["jobdir"])
+        Params = mapper.apply_run_flags(spec, baseParams)       # SKIP_PLOTS etc., on a deepcopy
+        Planet = mapper.build_planet(spec)                      # WHITELIST map, no importlib
+        emit({"type": "progress", "id": msg["id"], "stage": "run"})
+        Planet, Params = PlanetProfile(Planet, Params)          # the unchanged engine
+        manifest = results.build_manifest(msg["jobdir"])
+        results.write_result_json(results.extract_single(Planet, manifest), msg["jobdir"])
+        emit({"type": "result", "id": msg["id"], "status": "succeeded", "manifest": manifest})
     except Exception as e:
         import traceback
-        emit({"type": "error", "jobId": spec["jobId"], "errorKind": "physics",
-              "message": str(e), "traceback": traceback.format_exc()})
-        # process stays alive; native crashes instead exit → Rust respawns
+        emit({"type": "result", "id": msg["id"], "status": "failed",
+              "error": {"code": "engine_error", "message": str(e),
+                        "traceback": traceback.format_exc()}})
+        # process stays alive; a native segfault instead exits the process → the pool respawns it
 ```
 
 ---
@@ -1334,17 +1313,16 @@ for raw in sys.stdin:                                    # one job per line, for
 cd /Users/matstudents/MoonMelodies
 python -m PlanetProfile.install
 
-# 1. Build the Rust workspace
-cd backend
-cargo build --release            # or `cargo run -p mm-server -- …` for dev
+# 1. Install the backend extra (FastAPI + uvicorn on top of the already-installed engine)
+pip install -e ".[backend]"
 
 # 2. Run the server (loopback only)
-cargo run -p mm-server -- \
-    --python python3 \
+python -m PlanetProfile.API.server \
     --workers 8 \
     --data-dir ./mm-data \
     --bind 127.0.0.1:8787 \
     --allowed-origin https://<user>.github.io
+# (equivalently:  uvicorn PlanetProfile.API.server.app:app --host 127.0.0.1 --port 8787)
 
 # Server prints:  listening on http://127.0.0.1:8787   token=<random>
 # It also serves the static frontend at  http://127.0.0.1:8787/   (same-origin fallback)
@@ -1357,26 +1335,28 @@ cargo run -p mm-server -- \
 
 ---
 
-#### 10. What stays in Python vs. moves to Rust (and why the physics stays in Python)
+#### 10. Layering (it's all Python — engine core vs. thin orchestration shell)
+
+The all-Python decision doesn't erase the boundary that matters; it just removes the language seam. The engine stays untouched behind the JSON contract, and a *thin* FastAPI shell owns the edge. The split by concern:
 
 | Concern | Owner | Rationale |
 | --- | --- | --- |
-| Interior-structure physics: EOS, ice/ocean/inner layers, seismic, viscosity, induction, gravity/Love numbers | **Python (unchanged engine)** | The "physics" is a stack of native, separately-validated third-party packages with **no Rust equivalent**: SeaFreeze (LBF Gibbs EOS), gsw/TEOS-10 (compiled C), Reaktoro (C++ equilibrium engine + geochem DBs), Perple_X (164 MB Fortran-generated tables), PyALMA3 (mpmath arbitrary-precision), MoonMag, spiceypy (NAIF CSPICE), plus broad scipy usage (`root_scalar`, `solve_ivp`, `RegularGridInterpolator`, `lu_solve`, `sph_harm`). A port would be multi-year, would require revalidation against published benchmarks, and would permanently fork from upstream science. |
-| `PlanetStruct` construction from JSON, pipeline execution, result serialization | **Python (new `ppworker.py` only)** | Reuses the engine's own structs and `ResultsIO` extraction whitelist; keeps the declarative-JSON→struct mapping next to the code that defines those fields. |
-| HTTP/JSON API, validation, SSE, CORS/PNA, static hosting | **Rust** | Safe, fast, statically-typed edge; enforces the contract up front (`422`) instead of deep-stack failures. |
-| Job queue, worker-pool supervision, cancellation, timeouts, crash-respawn | **Rust** | tokio supervises subprocesses cleanly; process isolation contains native crashes and honors the engine's non-reentrant global state (one job per worker). |
-| Artifact storage/serving, retention, path-traversal defense | **Rust** | Jobdir-scoped, manifest-gated, loopback-only. |
+| Interior-structure physics: EOS, ice/ocean/inner layers, seismic, viscosity, induction, gravity/Love numbers | **Engine (unchanged Python)** | A stack of native, separately-validated third-party packages with **no non-Python equivalent**: SeaFreeze (LBF Gibbs EOS), gsw/TEOS-10 (compiled C), Reaktoro (C++ equilibrium engine + geochem DBs), Perple_X (164 MB Fortran-generated tables), PyALMA3 (mpmath arbitrary-precision), MoonMag, spiceypy (NAIF CSPICE), plus broad scipy usage. A port to any language would be multi-year, need revalidation against published benchmarks, and fork from upstream science. |
+| `PlanetStruct` construction from JSON, pipeline execution, result serialization | **`PlanetProfile/API/` (Phase 3, done)** | `mapper.py` + `results.py` reuse the engine's own structs and `ResultsIO` whitelist; the declarative-JSON→struct mapping lives next to the fields it maps. |
+| HTTP/JSON API, validation, SSE, CORS/PNA, static hosting | **FastAPI shell** | Pydantic/`validate.py` enforce the contract up front (`422`) instead of deep-stack failures; `schema.py` powers `/schema` + OpenAPI; StaticFiles serves the bundle same-origin. |
+| Job queue, worker-pool supervision, cancellation, timeouts, crash-respawn | **`pool.py` + registry (asyncio)** | The event loop supervises `ppworker.py` subprocesses; process isolation contains native crashes and honors the engine's non-reentrant global state (one job per worker). |
+| Artifact storage/serving, retention, path-traversal defense | **FastAPI shell** | Jobdir-scoped, manifest-gated (`results.build_manifest`), loopback-only. |
 
-**Bottom line:** Rust is the orchestration, validation, and delivery layer; Python remains the compute core. The warm-worker-pool boundary is the only clean, reentrancy-safe, crash-tolerant seam the engine offers — it amortizes the expensive one-time import + EOS warm-up while keeping every native dependency exactly where it already works.
+**Bottom line:** the FastAPI shell is the orchestration, validation, and delivery layer; the engine remains the compute core — same seam as the Rust plan, minus the second language. The warm-worker-pool boundary is the only clean, reentrancy-safe, crash-tolerant interface the engine offers, and it amortizes the expensive one-time import + EOS warm-up while keeping every native dependency exactly where it already works. Choosing Python for the shell means that shell is ~3 new files over the Phase 3 package rather than a separate Cargo workspace.
 
 ---
 
 
 ## 6. GitHub-Pages Static HTML Frontend Plan
 
-> **Summary.** The frontend is a single static SPA (Vite + TypeScript + Preact) that drives the local Rust backend over HTTP/JSON, built once and shipped to two places: embedded in the Rust binary and served same-origin at http://127.0.0.1:PORT (the guaranteed, zero-friction path), and published to GitHub Pages as a landing/docs page plus a convenience copy that health-probes the loopback backend. This dual-serve design confronts the real browser rule head-on: contrary to the common "HTTPS can't call http://localhost" claim, loopback IS a potentially-trustworthy secure context (so it is NOT mixed-content-blocked in Chrome/Edge/Firefox), but it still requires CORS + Private/Local-Network-Access handling and degrades on Safari — which is exactly why the same-origin backend-served copy is the recommended default and the Pages copy is a shareable convenience with graceful fallback. Client-side rendering uses uPlot for 1D layer profiles and a lazy-loaded heatmap/contour renderer for 2D ograms; server PNGs are optional download-only artifacts.
+> **Summary.** The frontend is a single static SPA (Vite + TypeScript + Preact) that drives the local FastAPI backend over HTTP/JSON, built once and shipped to two places: embedded in the FastAPI backend and served same-origin at http://127.0.0.1:PORT (the guaranteed, zero-friction path), and published to GitHub Pages as a landing/docs page plus a convenience copy that health-probes the loopback backend. This dual-serve design confronts the real browser rule head-on: contrary to the common "HTTPS can't call http://localhost" claim, loopback IS a potentially-trustworthy secure context (so it is NOT mixed-content-blocked in Chrome/Edge/Firefox), but it still requires CORS + Private/Local-Network-Access handling and degrades on Safari — which is exactly why the same-origin backend-served copy is the recommended default and the Pages copy is a shareable convenience with graceful fallback. Client-side rendering uses uPlot for 1D layer profiles and a lazy-loaded heatmap/contour renderer for 2D ograms; server PNGs are optional download-only artifacts.
 
-This section specifies the browser frontend for MoonMelodies: a static, single-page web app that lets a user configure a model run, submit it, watch progress, and explore results — by driving the **local Rust backend** described in the backend section. It obeys the Shared Architecture Contract (loopback-only backend, random startup token, client-side replot by default, dual-serve fallback).
+This section specifies the browser frontend for MoonMelodies: a static, single-page web app that lets a user configure a model run, submit it, watch progress, and explore results — by driving the **local FastAPI backend** described in the backend section. It obeys the Shared Architecture Contract (loopback-only backend, random startup token, client-side replot by default, dual-serve fallback).
 
 ### 1. The hard browser constraint, stated correctly
 
@@ -1395,7 +1375,7 @@ The task frames the blocker as *"a page served over HTTPS from `*.github.io` can
 
 | # | Strategy | What it buys | What it costs | Verdict |
 |---|---|---|---|---|
-| **A** | **Backend serves the SPA itself** at `http://127.0.0.1:PORT` (same scheme, same origin). | Zero CORS, zero mixed-content, zero PNA/LNA. Works in **every** browser incl. Safari. Token can be injected server-side. | Not a public `github.io` URL; user must open a localhost URL; the bundle must ship inside/with the Rust binary. | **RECOMMENDED — primary path** |
+| **A** | **Backend serves the SPA itself** at `http://127.0.0.1:PORT` (same scheme, same origin). | Zero CORS, zero mixed-content, zero PNA/LNA. Works in **every** browser incl. Safari. Token can be injected server-side. | Not a public `github.io` URL; user must open a localhost URL; the bundle must ship inside/with the FastAPI backend. | **RECOMMENDED — primary path** |
 | **B** | **GH Pages hosts the SPA**, which calls the loopback backend cross-origin. | One canonical public URL to share/bookmark; auto-updates on `git push`; nothing to install to *view* the UI. | Needs CORS + PNA/LNA on the server; **fails on Safari**; subject to Chrome LNA permission prompt/denial. | **RECOMMENDED — convenience path, with fallback** |
 | C | **HTTPS on localhost** via a locally-trusted cert (e.g. `mkcert`). | Same-scheme HTTPS, no mixed content. | Per-user cert-authority install into the OS trust store; cert generation/rotation; a scientific end-user will not do this. | Reject (setup friction) |
 | D | **Companion desktop wrapper** (Tauri/Electron webview). | No browser security model at all; native install. | Per-OS builds + signing; defeats "static HTML on GH Pages"; large maintenance surface. | Defer (possible future packaging) |
@@ -1403,7 +1383,7 @@ The task frames the blocker as *"a page served over HTTPS from `*.github.io` can
 
 **Recommendation — ship A and B together ("build once, serve twice"):**
 
-- **A is the default and the guarantee.** The Rust backend embeds the compiled static bundle and serves it at `http://127.0.0.1:PORT/`. When the user runs the backend, it prints (and optionally auto-opens) `http://127.0.0.1:PORT/?token=…`. Same origin ⇒ no CORS, no PNA, no Safari problem, and the token is handed to the page in the URL by the very server that minted it.
+- **A is the default and the guarantee.** The FastAPI backend embeds the compiled static bundle and serves it at `http://127.0.0.1:PORT/`. When the user runs the backend, it prints (and optionally auto-opens) `http://127.0.0.1:PORT/?token=…`. Same origin ⇒ no CORS, no PNA, no Safari problem, and the token is handed to the page in the URL by the very server that minted it.
 - **B is the shareable front door.** `https://9livezzz-git.github.io/MoonMelodies/` hosts a **landing/install/docs page** plus a **full copy of the same SPA**. On load it **health-probes** the loopback backend; if reachable (Chromium/Firefox with PNA allowed) it works cross-origin exactly like A; if not (Safari, LNA denied, backend not running) it shows a clear **"Open the local app instead → `http://127.0.0.1:PORT`"** panel with copy-paste install/run instructions.
 
 The user always has a path that works; the *nice* path (public URL) is used when the browser permits and silently degrades to the *guaranteed* path when it does not.
@@ -1416,7 +1396,7 @@ flowchart LR
     L[Landing + docs] --- S1[SPA copy]
   end
   subgraph Local[User machine · loopback only]
-    R[Rust backend<br/>127.0.0.1:PORT<br/>+ startup token] --- S2[Same SPA bundle<br/>served same-origin]
+    R[FastAPI backend<br/>127.0.0.1:PORT<br/>+ startup token] --- S2[Same SPA bundle<br/>served same-origin]
     R --- W[Warm Python<br/>worker pool<br/>ppworker.py]
   end
   S1 -- "cross-origin fetch/SSE<br/>(CORS + PNA, Chromium/FF)" --> R
@@ -1431,9 +1411,9 @@ Both `S1` and `S2` are **byte-identical** builds of `frontend/`. The only runtim
 
 **Recommendation: a small bundler + a light framework, not hand-rolled vanilla and not a heavy SPA framework.**
 
-- **Bundler: Vite.** Produces a static, dependency-inlined bundle deployable to Pages and embeddable in the Rust binary. Fast dev server with hot reload against a locally-running backend. Handles code-splitting so the heavy 2D plotting lib is lazy-loaded.
+- **Bundler: Vite.** Produces a static, dependency-inlined bundle deployable to Pages and embeddable in the FastAPI backend. Fast dev server with hot reload against a locally-running backend. Handles code-splitting so the heavy 2D plotting lib is lazy-loaded.
 - **Framework: Preact + TypeScript.** ~4 KB runtime, React-compatible API, ergonomic for the form-heavy config UI and the results dashboard. TypeScript lets us generate request/result types directly from the API's `/schema` contract (io-recon shapes A/B/C), catching field-name drift at compile time. *Svelte is an acceptable alternative if the team prefers it; the plan does not depend on the choice.*
-- **Routing: hash-based (`/#/run`, `/#/results/{id}`).** Hash routing needs **no** server-side SPA-fallback rewrite, so the identical bundle deep-links correctly both on GH Pages (which has no SPA rewrite) and when served by the Rust backend.
+- **Routing: hash-based (`/#/run`, `/#/results/{id}`).** Hash routing needs **no** server-side SPA-fallback rewrite, so the identical bundle deep-links correctly both on GH Pages (which has no SPA rewrite) and when served by the FastAPI backend.
 - **Styling: a single hand-written CSS file with CSS custom properties** for light/dark theming; no CSS framework dependency. Keeps the bundle small and CSP-friendly.
 - **No secrets, no analytics, no third-party network calls** in the bundle — it only ever talks to the loopback backend the user points it at.
 
@@ -1646,7 +1626,7 @@ Then set **Settings → Pages → Source = GitHub Actions**, and delete the `Dep
 The **same `frontend/dist/`** feeds both serve paths, guaranteeing the Pages copy and the backend-served copy behave identically:
 
 1. **CI** builds `dist/` and deploys it to Pages (Section 9).
-2. The **Rust build** embeds the same `dist/` into the binary (e.g. `rust-embed`/`include_dir`) and serves it at `/`. The Rust release build invokes `npm run build` (or consumes a CI-produced `dist/` artifact) so the embedded UI never drifts from the published one. Versioning: stamp the build (`git describe`) into both the SPA (`window.__MM__.version`) and `GET /health`, and have the Connect screen warn if the page version and backend version differ.
+2. The **backend** serves that same `dist/` at `/` via `StaticFiles` (pointed at the built bundle, or a `dist/` produced in CI) so the same-origin UI never drifts from the published one. Versioning: stamp the build (`git describe`) into both the SPA (`window.__MM__.version`) and `GET /health`, and have the Connect screen warn if the page version and backend version differ.
 
 This is the crux of the whole plan: **one artifact, two delivery channels**, with the same-origin channel as the reliability floor and Pages as the discoverability ceiling.
 
