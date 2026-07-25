@@ -28,12 +28,13 @@ We'd also love to hear about your work — reach the PlanetProfile team at steve
 Relative to upstream PlanetProfile, this fork contributes:
 
 - **A declarative JSON API boundary** (`PlanetProfile/API/`). A whitelist mapper builds the engine's `PlanetStruct` from plain JSON — never by importing a user `PP<Body>.py` file — and a thin `ppworker` harness runs models over stdin/stdout, so the engine can be driven safely by a server or UI. Verified to reproduce a CLI run bit-for-bit.
+- **A local backend** (`PlanetProfile/API/server/`, FastAPI + uvicorn). A loopback-only HTTP/JSON + SSE server that fronts the engine through a warm pool of `ppworker` subprocesses — submit a model as JSON, watch progress over Server-Sent Events, and pull back results + artifacts. Loopback-bound with a per-session token, CORS/PNA handling for a GitHub-Pages frontend, and one job per worker (the engine is non-reentrant). See [Running the local backend](#running-the-local-backend).
 - **LaTeX-free plotting.** Every figure renders through matplotlib's built-in mathtext, so no LaTeX/siunitx installation is needed for headless or server-side plot generation.
 - **Bayesian interior inference** (`PlanetProfile.Inference`). MCMC (pocoMC) and simulation-based inference (`sbi`/`torch`) constrain interior parameters against tidal Love numbers, gravity, and magnetic-induction observables, with a full suite of posterior and diagnostic figures. Optional — `pip install -e ".[inference]"`.
 - **A stabilized engine.** Imports cleanly on modern Python, is safe to call repeatedly within one long-lived process (per-run config isolation), no longer blocks on import-time stdin prompts, and ships with a regression-test suite (`tests/`). The full `BuildTest` physics suite runs green.
 - **A much smaller repository.** The frozen MATLAB implementation is archived under `legacy-matlab/`, large binary data was purged from git history (`.git` shrank ~94%), and the Perple_X EOS tables are fetched on install rather than committed.
 
-**Planned (see the spec):** a local-only **Python (FastAPI) backend** that orchestrates a warm pool of `ppworker` processes, and a **static GitHub-Pages frontend** that talks to it at `127.0.0.1` and renders results in-browser. The `backend/` and `frontend/` directories are scaffolds for that work.
+**Planned (see the spec):** a **static GitHub-Pages frontend** that talks to the local backend at `127.0.0.1` and renders results in-browser (the `frontend/` directory is a scaffold for that bundle). The backend itself is built (`PlanetProfile/API/server/`).
 
 ---
 
@@ -68,7 +69,7 @@ pip install SeaFreeze hdf5storage PyALMA3
 # 2. Clone and install this fork (editable)
 git clone https://github.com/9LiveZZZ-Git/MoonMelodies
 cd MoonMelodies
-pip install -e .                       # add ".[inference]" for the Bayesian-inference extra
+pip install -e .                       # add ".[backend]" for the local server, ".[inference]" for Bayesian inference
 
 # 3. One-time engine setup: seeds UserConfigs/ and downloads the ~164 MB Perple_X EOS tables
 python -m PlanetProfile.install PPinstall
@@ -87,6 +88,8 @@ RunPPfile('Europa', 'PPEuropa.py')
 
 Exact dependency pins are in [`pyproject.toml`](pyproject.toml). See the prerequisite links below for anything conda/pip can't resolve directly.
 
+> **What a fresh clone + install covers.** The steps above give a **complete engine and backend** — every model type (hydrosphere, interior, seismic, gravity/Love numbers, magnetic induction, ExploreOgram/InductOgram/MonteCarlo) runs, because the SPICE leap-second/PCK/frame kernels, Reaktoro databases, all `Default/PP<Body>.py` inputs, and the MgSO₄/NH₃ reference data are tracked in the repo, and `install` downloads the ~164 MB Perple_X EOS tables and seeds `UserConfigs/`. Two **optional** features need data that is *not* in the repo and must be fetched separately: SPICE **ephemeris kernels** (`.bsp`, large — only for spacecraft trajectory analysis; download from [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/) into `SPICE/`), and the **Bayesian-inference** structure caches + SBI model artifacts (see the spec's inference notes). Neither is required for standard modeling or the backend.
+
 ### Running the tests
 
 ```bash
@@ -98,6 +101,29 @@ pytest tests/                            # fast regression tests (optional)
 Adding major functionality should come with a matching `PlanetProfile/Test/PPTest#.py` body; `BuildTest` must pass before merging.
 
 ---
+
+## Running the local backend
+
+The backend fronts the engine over HTTP so a browser UI (or `curl`) can drive it. Install the backend extra and start it from a directory seeded by `python -m PlanetProfile.install` (which creates `UserConfigs/`):
+
+```bash
+pip install -e ".[backend]"          # FastAPI + uvicorn, on top of the engine
+python -m PlanetProfile.install      # once: seed UserConfigs/ + download the EOS tables
+python -m PlanetProfile.API.server --workers 4 --allowed-origin https://<user>.github.io
+```
+
+On startup it prints the loopback URL and a random **session token**; every request needs it (`Authorization: Bearer <token>`, or `?token=` for the SSE stream). Key endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | liveness + worker/EOS-cache readiness (unauthenticated, so the frontend can detect it) |
+| `GET /bodies` · `/schema` · `/schema/{body}` | body list, input/output schema + enums, per-body default inputs |
+| `POST /runs` | submit a model as JSON → `202 {id}` (or `422` with field-level errors) |
+| `GET /runs/{id}/events` | Server-Sent Events progress stream |
+| `GET /runs/{id}` · `/result` · `/artifacts` · `/artifacts/{name}` | status, result JSON, artifact manifest + download |
+| `DELETE /runs/{id}` | cancel (kills + respawns the worker) |
+
+It binds `127.0.0.1`/`::1` **only**, runs one job per warm worker (the engine is non-reentrant), and validates every request up front. It can also serve a static frontend bundle same-origin with `--static-dir <dir>` (the zero-CORS path). See [`docs/spec`](docs/spec/MoonMelodies_Spec_and_Refactor.md) §3/§5 for the full contract.
 
 ## Prerequisites (the engine's scientific stack)
 
@@ -121,10 +147,10 @@ Most of these install via the commands above; the links are for manual installs 
 | Path | What it is |
 |---|---|
 | `PlanetProfile/` | The scientific engine (the import package — unchanged from upstream in name and layout). |
-| `PlanetProfile/API/` | The MoonMelodies JSON API boundary (mapper, validation, schema, results, `ppworker`). |
+| `PlanetProfile/API/` | The MoonMelodies JSON API boundary (mapper, validation, schema, results, `ppworker`) + the worker `pool` and the FastAPI `server/`. |
 | `PlanetProfile/Inference/` | Bayesian interior inference (MCMC + SBI). |
 | `legacy-matlab/` | The frozen MATLAB implementation, archived (imported by nothing in Python). |
-| `backend/`, `frontend/` | Scaffolds for the planned FastAPI backend and static web UI. |
+| `frontend/`, `backend/` | Scaffolds for the planned static web UI (the FastAPI backend itself lives in `PlanetProfile/API/server/`). |
 | `docs/spec/` | The MoonMelodies spec & refactor plan. |
 | `tests/` | Regression tests. |
 | `configs/`, `data-assets/` | Configuration and data-manifest scaffolding. |

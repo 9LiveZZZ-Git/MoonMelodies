@@ -63,6 +63,14 @@ inference = [
     "seaborn>=0.13",
     "PyYAML>=6.0",
 ]
+# Local orchestration backend (PlanetProfile.API.server): a FastAPI/uvicorn app that
+# fronts the engine through a warm pool of ppworker subprocesses. Light stack -- install
+# with:  pip install -e ".[backend]"  then run  python -m PlanetProfile.API.server
+backend = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "httpx>=0.27",          # test client for the integration smoke test
+]
 
 [project.urls]
 Homepage = "https://github.com/9LiveZZZ-Git/MoonMelodies"

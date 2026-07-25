@@ -1,0 +1,171 @@
+""" Asyncio warm-worker pool for the FastAPI backend.
+
+Supervises N long-lived ``ppworker`` subprocesses (``python -m PlanetProfile.API.ppworker``),
+each of which imports the engine once and then runs one job at a time over a JSONL
+stdin/stdout channel (see ppworker.py for the protocol). The pool hands a free worker to
+one job at a time (the engine is non-reentrant), streams the worker's progress messages
+to a callback, and kills+respawns a worker on crash, timeout, or cancellation.
+
+Nothing here imports the engine — the heavy PlanetProfile import lives only in the worker
+subprocesses, so a native crash (Reaktoro/CSPICE) takes down one worker, never the server.
+"""
+import os
+import sys
+import json
+import asyncio
+import logging
+
+log = logging.getLogger('PlanetProfile.API.pool')
+
+
+class WorkerError(Exception):
+    """ Base class for worker-pool failures. """
+
+
+class WorkerCrashed(WorkerError):
+    """ The worker process died (stdout EOF / nonzero exit) before a terminal message. """
+
+
+class Worker:
+    """ One ppworker subprocess: import-once, one job in-flight, JSONL over stdin/stdout. """
+
+    def __init__(self, wid, cmd, cwd, env):
+        self.wid = wid
+        self._cmd = cmd
+        self._cwd = cwd
+        self._env = env
+        self.proc = None
+        self.version = None
+
+    async def start(self, ready_timeout=180.0):
+        """ Spawn the subprocess and block until it emits its ``ready`` message. """
+        self.proc = await asyncio.create_subprocess_exec(
+            *self._cmd, cwd=self._cwd, env=self._env,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL)  # engine logs go to the worker's stderr
+        try:
+            line = await asyncio.wait_for(self.proc.stdout.readline(), timeout=ready_timeout)
+        except asyncio.TimeoutError:
+            await self.kill()
+            raise WorkerCrashed(f'worker {self.wid} timed out before ready')
+        if not line:
+            raise WorkerCrashed(f'worker {self.wid} exited before ready')
+        msg = json.loads(line)
+        if msg.get('type') != 'ready':
+            raise WorkerCrashed(f'worker {self.wid} first message was not "ready": {msg.get("type")}')
+        self.version = msg.get('version')
+        log.debug(f'worker {self.wid} ready (pid {msg.get("pid")}, engine {self.version})')
+
+    async def run_job(self, jobid, spec, jobdir, on_progress=None):
+        """ Hand one job to this worker; forward progress; return the terminal result dict.
+
+            Raises WorkerCrashed if the process dies before a terminal ``result`` message
+            (the caller then respawns the worker). Cancelling the awaiting task (e.g. on
+            timeout/cancel) should be followed by kill()+respawn, since a running native
+            call cannot be interrupted otherwise.
+        """
+        job = {'type': 'job', 'id': jobid, 'spec': spec, 'jobdir': jobdir}
+        self.proc.stdin.write((json.dumps(job) + '\n').encode())
+        await self.proc.stdin.drain()
+        while True:
+            line = await self.proc.stdout.readline()
+            if not line:
+                raise WorkerCrashed(f'worker {self.wid} died mid-job {jobid}')
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # stdout is a pristine JSON channel; ignore any stray line defensively
+            mtype = msg.get('type')
+            if mtype == 'progress':
+                if on_progress is not None:
+                    await on_progress(msg)
+            elif mtype == 'result':
+                return msg
+            # ignore a stray 'ready' mid-job
+
+    async def kill(self):
+        if self.proc is not None and self.proc.returncode is None:
+            try:
+                self.proc.kill()
+            except ProcessLookupError:
+                pass
+            try:
+                await asyncio.wait_for(self.proc.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                pass
+
+    async def quit(self):
+        """ Ask the worker to exit cleanly; kill if it doesn't. """
+        try:
+            self.proc.stdin.write(b'{"type":"quit"}\n')
+            await self.proc.stdin.drain()
+            await asyncio.wait_for(self.proc.wait(), timeout=5.0)
+        except Exception:
+            await self.kill()
+
+
+class WorkerPool:
+    """ A fixed-size pool of warm workers with a free-list. One job per worker at a time. """
+
+    def __init__(self, n_workers, python=None, cwd=None, env=None):
+        self.n_workers = max(1, int(n_workers))
+        self.python = python or sys.executable
+        self.cwd = cwd
+        self.extra_env = env or {}
+        self._free = asyncio.Queue()
+        self._workers = []
+        self._counter = 0
+        self._closing = False
+
+    def _worker_env(self):
+        env = dict(os.environ)
+        env.update(self.extra_env)
+        env.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')   # torch/OpenMP on macOS; harmless elsewhere
+        return env
+
+    async def _spawn(self):
+        self._counter += 1
+        w = Worker(self._counter, [self.python, '-m', 'PlanetProfile.API.ppworker'],
+                   self.cwd, self._worker_env())
+        await w.start()
+        self._workers.append(w)
+        return w
+
+    async def start(self):
+        """ Spawn all workers concurrently and place them on the free-list. """
+        workers = await asyncio.gather(*[self._spawn() for _ in range(self.n_workers)])
+        for w in workers:
+            self._free.put_nowait(w)
+        log.info(f'worker pool ready: {len(workers)} workers')
+
+    async def acquire(self):
+        """ Await and return a free worker (backpressure = concurrency cap). """
+        return await self._free.get()
+
+    def release(self, w):
+        """ Return a healthy worker to the free-list. """
+        if not self._closing:
+            self._free.put_nowait(w)
+
+    async def replace(self, w):
+        """ Kill a dead/cancelled worker and spawn a fresh one back onto the free-list. """
+        await w.kill()
+        if w in self._workers:
+            self._workers.remove(w)
+        if not self._closing:
+            try:
+                nw = await self._spawn()
+                self._free.put_nowait(nw)
+            except Exception as e:                       # noqa: BLE001
+                log.error(f'failed to respawn a replacement worker: {e}')
+
+    def ready_count(self):
+        return self._free.qsize()
+
+    def total_count(self):
+        return len(self._workers)
+
+    async def close(self):
+        self._closing = True
+        await asyncio.gather(*[w.quit() for w in list(self._workers)], return_exceptions=True)
