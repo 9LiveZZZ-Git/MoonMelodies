@@ -125,6 +125,8 @@ On startup it prints the loopback URL and a random **session token**; every requ
 
 It binds `127.0.0.1`/`::1` **only**, runs one job per warm worker (the engine is non-reentrant), and validates every request up front. It can also serve a static frontend bundle same-origin with `--static-dir <dir>` (the zero-CORS path). See [`docs/spec`](docs/spec/MoonMelodies_Spec_and_Refactor.md) §3/§5 for the full contract.
 
+**Robustness & limits.** The backend has been audited across sanity, memory, speed, and robustness: a killed worker is respawned and the pool keeps serving, cancellation and timeouts kill+respawn cleanly, and malformed / oversized / unauthenticated / path-traversal requests are rejected with the right status while the server stays up (server RSS stays flat across jobs). Tunable safeguards: `--workers` (default `cpu−2`), `--job-timeout` (per-job wall-clock → kill+respawn), plus internal caps on request-body size and grid cells, a job-retention reaper + count cap, and **worker recycling** (a worker is respawned after a set number of jobs to bound the engine's per-run memory growth in a long-lived process).
+
 ## Prerequisites (the engine's scientific stack)
 
 Most of these install via the commands above; the links are for manual installs and background.

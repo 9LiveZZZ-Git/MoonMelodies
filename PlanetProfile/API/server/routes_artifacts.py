@@ -24,13 +24,13 @@ async def get_artifact(jid: str, name: str, request: Request):
     job = request.app.state.registry.get(jid)
     if job is None:
         raise HTTPException(status_code=404, detail='no such run')
-    # Serve ONLY names present in the manifest — no client-supplied paths, no traversal.
-    names = {m['name'] for m in results.build_manifest(job.jobdir)}
-    if name not in names:
-        raise HTTPException(status_code=404, detail='no such artifact')
-    path = os.path.abspath(os.path.join(job.jobdir, name))
-    if not path.startswith(os.path.abspath(job.jobdir) + os.sep):
+    # Path-safety IS the allowlist: the resolved path must be a real file strictly inside
+    # the jobdir. This blocks traversal, needs no jobdir walk, and (unlike the worker's
+    # pre-write manifest) correctly serves result.json and anything written after it.
+    jobdir = os.path.abspath(job.jobdir)
+    path = os.path.abspath(os.path.join(jobdir, name))
+    if not path.startswith(jobdir + os.sep):
         raise HTTPException(status_code=403, detail='path escapes jobdir')
     if not os.path.isfile(path):
-        raise HTTPException(status_code=404, detail='artifact missing on disk')
+        raise HTTPException(status_code=404, detail='no such artifact')
     return FileResponse(path, filename=os.path.basename(name))

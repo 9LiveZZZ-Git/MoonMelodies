@@ -65,6 +65,8 @@ class _FakePool:
         pass
     async def replace(self, w):
         pass
+    def should_recycle(self, w):
+        return False
     async def close(self):
         pass
     def ready_count(self):
@@ -104,6 +106,24 @@ def test_validation_422():
                'ocean': {'wOcean_ppt': 35.0}}
         assert client.post('/runs', headers=h, content=json.dumps(bad)).status_code == 422
         assert client.post('/runs', headers=h, content=json.dumps({'body': 'Xena'})).status_code == 422
+
+
+def test_malformed_requests_are_422_not_500():
+    if _skip():
+        return
+    client, cfg = _client()
+    h = {'Authorization': f'Bearer {cfg.token}'}
+    with client:
+        # non-dict JSON body -> 422 (was a 500 before the audit fix)
+        assert client.post('/runs', headers=h, content='[]').status_code == 422
+        assert client.post('/runs', headers=h, content='"hello"').status_code == 422
+        # malformed JSON -> 400
+        assert client.post('/runs', headers=h, content='{not json').status_code == 400
+        # grid mode with non-numeric nx/ny -> 422, not 500
+        bad_grid = {'body': 'Europa', 'mode': 'exploreogram', 'bulk': {'Tb_K': 268.3},
+                    'ocean': {'wOcean_ppt': 35.0},
+                    'explore': {'xName': 'Tb_K', 'yName': 'wOcean_ppt', 'nx': 'lots', 'ny': 10}}
+        assert client.post('/runs', headers=h, content=json.dumps(bad_grid)).status_code == 422
 
 
 def test_full_run_path_with_fake_pool():

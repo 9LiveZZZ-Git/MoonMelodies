@@ -57,9 +57,16 @@ async def bodies():
     return {'bodies': [{'name': b, 'hasDefault': True} for b in sorted(validate.KNOWN_BODIES)]}
 
 
+_SCHEMA_CACHE = None
+
+
 @router.get('/schema', dependencies=[Depends(require_token)])
 async def get_schema():
-    return schemamod.schema_payload()
+    # The payload is deterministic per install (structs + EOS-table listing); build it once.
+    global _SCHEMA_CACHE
+    if _SCHEMA_CACHE is None:
+        _SCHEMA_CACHE = schemamod.schema_payload()
+    return _SCHEMA_CACHE
 
 
 @router.get('/schema/{body}', dependencies=[Depends(require_token)])

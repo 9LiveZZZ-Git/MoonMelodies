@@ -59,7 +59,10 @@ async def _run_one(app, job):
                                             return_when=asyncio.FIRST_COMPLETED)
         if run_task in done:
             _apply_result(job, run_task.result())          # may raise WorkerCrashed
-            pool.release(worker)
+            if pool.should_recycle(worker):                # bound long-lived worker RSS growth
+                await pool.replace(worker)
+            else:
+                pool.release(worker)
         else:
             run_task.cancel()
             if cancel_task in done:

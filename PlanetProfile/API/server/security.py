@@ -4,8 +4,11 @@ The server binds loopback only; on top of that it (a) requires a per-session ran
 on every request (blocks other local processes/pages from driving it), (b) validates the
 Host header against loopback (DNS-rebinding defense), and (c) allowlists CORS origins.
 """
+import secrets
+
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import PlainTextResponse
 
 
 def get_token(request: Request) -> str:
@@ -19,7 +22,7 @@ def get_token(request: Request) -> str:
 async def require_token(request: Request):
     """ FastAPI dependency: 401 unless the request carries the session token. """
     expected = request.app.state.config.token
-    if get_token(request) != expected:
+    if not secrets.compare_digest(get_token(request), expected):   # constant-time
         raise HTTPException(status_code=401, detail='missing or invalid session token')
     return True
 
@@ -35,8 +38,9 @@ class HostGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         host = (request.headers.get('host') or '').strip()
         # Allow empty host only for non-network test clients; otherwise enforce loopback.
+        # Return a Response directly — an exception raised inside middleware becomes a 500.
         if host and host not in self._allowed:
-            raise HTTPException(status_code=421, detail=f'host not allowed: {host}')
+            return PlainTextResponse(f'host not allowed: {host}', status_code=421)
         return await call_next(request)
 
 

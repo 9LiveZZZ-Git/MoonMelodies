@@ -36,6 +36,7 @@ class Worker:
         self._env = env
         self.proc = None
         self.version = None
+        self.jobs_done = 0            # for recycling: bound long-lived worker RSS growth
 
     async def start(self, ready_timeout=180.0):
         """ Spawn the subprocess and block until it emits its ``ready`` message. """
@@ -51,9 +52,13 @@ class Worker:
             raise WorkerCrashed(f'worker {self.wid} timed out before ready')
         if not line:
             raise WorkerCrashed(f'worker {self.wid} exited before ready')
-        msg = json.loads(line)
-        if msg.get('type') != 'ready':
-            raise WorkerCrashed(f'worker {self.wid} first message was not "ready": {msg.get("type")}')
+        try:                                          # kill (don't leak) the child on a bad handshake
+            msg = json.loads(line)
+            if msg.get('type') != 'ready':
+                raise WorkerCrashed(f'worker {self.wid} first message was not "ready": {msg.get("type")}')
+        except Exception:
+            await self.kill()
+            raise
         self.version = msg.get('version')
         log.debug(f'worker {self.wid} ready (pid {msg.get("pid")}, engine {self.version})')
 
@@ -81,6 +86,7 @@ class Worker:
                 if on_progress is not None:
                     await on_progress(msg)
             elif mtype == 'result':
+                self.jobs_done += 1
                 return msg
             # ignore a stray 'ready' mid-job
 
@@ -108,15 +114,21 @@ class Worker:
 class WorkerPool:
     """ A fixed-size pool of warm workers with a free-list. One job per worker at a time. """
 
-    def __init__(self, n_workers, python=None, cwd=None, env=None):
+    def __init__(self, n_workers, python=None, cwd=None, env=None, max_jobs_per_worker=64):
         self.n_workers = max(1, int(n_workers))
         self.python = python or sys.executable
         self.cwd = cwd
         self.extra_env = env or {}
+        self.max_jobs_per_worker = int(max_jobs_per_worker)   # 0 = unlimited; else recycle to cap RSS
         self._free = asyncio.Queue()
         self._workers = []
         self._counter = 0
         self._closing = False
+
+    def should_recycle(self, w):
+        """ Whether a worker has done enough jobs that it should be recycled instead of reused
+            (bounds the engine's per-run memory growth in a long-lived worker). """
+        return self.max_jobs_per_worker and getattr(w, 'jobs_done', 0) >= self.max_jobs_per_worker
 
     def _worker_env(self):
         env = dict(os.environ)
@@ -149,16 +161,26 @@ class WorkerPool:
             self._free.put_nowait(w)
 
     async def replace(self, w):
-        """ Kill a dead/cancelled worker and spawn a fresh one back onto the free-list. """
+        """ Kill a dead/cancelled/recycled worker and spawn a fresh one onto the free-list.
+
+            Retries the spawn so a transient failure does not permanently shrink the pool
+            (a shrunk-to-zero pool would deadlock acquire()); logs critically only if every
+            attempt fails. """
         await w.kill()
         if w in self._workers:
             self._workers.remove(w)
-        if not self._closing:
+        if self._closing:
+            return
+        for attempt in range(3):
             try:
                 nw = await self._spawn()
                 self._free.put_nowait(nw)
+                return
             except Exception as e:                       # noqa: BLE001
-                log.error(f'failed to respawn a replacement worker: {e}')
+                log.error(f'respawn attempt {attempt + 1}/3 failed: {e}')
+                await asyncio.sleep(0.5 * (attempt + 1))
+        log.critical(f'could not respawn a worker after 3 attempts; pool degraded to '
+                     f'{len(self._workers)} worker(s)')
 
     def ready_count(self):
         return self._free.qsize()
