@@ -257,6 +257,52 @@ def grid2d_from(arr):
     return None if arr is None else to_jsonable(np.asarray(arr))
 
 
+def extract_induct_grid(IR, Params, manifest=None):
+    """ Build the sigma-type InductOgram result dict from a completed InductionResultsStruct.
+
+        The induction response is (nExcitation x nSigma x nD); each excitation's |Ae|
+        amplitude becomes a 2-D (nSigma x nD) field keyed by its period label, so the
+        client can colour the heatmap by any excitation. Phase is carried alongside. Axes
+        are the ocean conductivity (x, log S/m) and ocean thickness (y, log km) meshes.
+    """
+    ind = IR.induction
+    base = IR.base
+    Amp = np.asarray(ind.Amp)                     # (nExc, nSigma, nD)
+    Phase = np.asarray(ind.Phase)
+    Texc = np.atleast_1d(np.asarray(ind.Texc_hr, dtype=float))
+    labels = [str(x).strip() for x in np.atleast_1d(ind.calcedExc)]
+    nExc, nS, nD = Amp.shape
+
+    grid = {}
+    phase = {}
+    for e in range(nExc):
+        key = labels[e] if e < len(labels) else f'exc{e}'
+        grid[key] = to_jsonable(Amp[e])
+        phase[key] = to_jsonable(Phase[e])
+    grid['VALID'] = [[True] * nD for _ in range(nS)]   # sigma cells are analytic; all valid
+    excitations = [{'label': (labels[e] if e < len(labels) else f'exc{e}'),
+                    'Texc_hr': float(Texc[e]) if e < Texc.size else None} for e in range(nExc)]
+
+    return {
+        'meta': {
+            'body': IR.bodyname, 'bodyname': IR.bodyname, 'mode': 'inductogram',
+            'valid': True, 'nx': int(nS), 'ny': int(nD),
+            'xName': 'sigmaMean_Sm', 'yName': 'D_km',
+            'excitations': excitations,
+            'availableZ': [e['label'] for e in excitations],
+            'artifacts': manifest if manifest is not None else [],
+        },
+        'grid': grid,
+        'axes': {
+            'xData': grid2d_from(base.sigmaMean_Sm),
+            'yData': grid2d_from(base.D_km),
+            'xScale': 'log', 'yScale': 'log',
+            'xUnits': 'S/m', 'yUnits': 'km',
+        },
+        'induction': {'phase': phase, 'excitations': excitations},
+    }
+
+
 def build_manifest(jobdir, hrefBase=None):
     """ Enumerate on-disk artifacts under jobdir as [{name, kind, mime, bytes, href}].
 

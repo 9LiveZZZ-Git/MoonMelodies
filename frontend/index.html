@@ -23,6 +23,7 @@
   --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}   /* flex/grid children set their own display, which otherwise beats [hidden] */
 html,body{margin:0}
 body{background:var(--paper); color:var(--ink);
   font:14px/1.5 var(--display); -webkit-font-smoothing:antialiased;
@@ -167,6 +168,7 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 .rng{display:flex; align-items:center; gap:6px}
 .rng input{width:64px; text-align:right}
 .rng .dash{opacity:.4; font:12px var(--mono)}
+.fixedax{font:12px/1.3 var(--mono); color:var(--ink); border:1px solid var(--hair2); border-radius:2px; padding:7px 10px}
 .needs{font:11px var(--mono); letter-spacing:.04em; color:var(--ink); opacity:.55; padding:14px 0}
 .needs b{font-weight:600; opacity:.85}
 
@@ -290,17 +292,20 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 
   <!-- ExploreOgram: 2-D parameter sweep -->
   <section class="tool" id="exploreSec" aria-label="Two-parameter sweep">
-    <div class="fhead">2-D parameter sweep · ExploreOgram</div>
+    <div class="fhead">2-D parameter sweep</div>
     <div class="toolctl">
-      <div class="cell"><span class="clab">X axis</span>
+      <div class="cell"><span class="clab">Sweep</span>
+        <select id="exMode" aria-label="Sweep type"><option value="exploreogram">Interior structure · ExploreOgram</option><option value="inductogram">Induction response · InductOgram</option></select></div>
+      <div class="cell axcell"><span class="clab">X axis</span>
         <select id="exX" aria-label="Sweep X parameter"></select>
         <div class="rng"><input id="exX0" class="mono tnum" inputmode="decimal" aria-label="X min"><span class="dash">–</span><input id="exX1" class="mono tnum" inputmode="decimal" aria-label="X max"></div></div>
-      <div class="cell"><span class="clab">Y axis</span>
+      <div class="cell axcell"><span class="clab">Y axis</span>
         <select id="exY" aria-label="Sweep Y parameter"></select>
         <div class="rng"><input id="exY0" class="mono tnum" inputmode="decimal" aria-label="Y min"><span class="dash">–</span><input id="exY1" class="mono tnum" inputmode="decimal" aria-label="Y max"></div></div>
+      <div class="cell indnote" hidden><span class="clab">Axes</span><div class="fixedax mono">ocean σ × thickness<br><span style="opacity:.55">log-spaced, from config</span></div></div>
       <div class="cell"><span class="clab">Grid</span>
         <select id="exN" aria-label="Grid resolution"><option value="5">5 × 5</option><option value="7">7 × 7</option><option value="9">9 × 9</option></select></div>
-      <div class="cell"><span class="clab">Color by</span><select id="exZ" aria-label="Colour field"></select></div>
+      <div class="cell"><span class="clab" id="exZlab">Color by</span><select id="exZ" aria-label="Colour field"></select></div>
       <div class="cell"><span class="clab">&nbsp;</span><button class="compute" id="runGrid"><span class="rl">Run sweep</span><span class="arw" aria-hidden="true">&#9656;</span></button></div>
     </div>
     <div class="needs" id="exNeeds" hidden><b>Connect the engine</b> to run a live sweep — each grid cell is a full interior model.</div>
@@ -981,7 +986,8 @@ function drawHeatmap(cv, res, zKey){
   g.save(); g.translate(11,pt+IH/2); g.rotate(-Math.PI/2); g.textAlign='center'; g.fillText(axisTitle(meta.yName),0,0); g.restore();
   return {lo,hi};
 }
-function axisTitle(k){ const a=SWEEP_AXES.find(x=>x.k===k); return a?(a.lab+(a.u?' ('+a.u+')':'')).toUpperCase():String(k).toUpperCase(); }
+function axisTitle(k){ const a=SWEEP_AXES.find(x=>x.k===k); if(a) return (a.lab+(a.u?' ('+a.u+')':'')).toUpperCase();
+  const M={sigmaMean_Sm:'OCEAN σ (S/m)', D_km:'OCEAN THICKNESS (km)'}; return M[k]||String(k).toUpperCase(); }
 
 /* light marching-squares: a few iso-lines over the finite region */
 function contours(g, Z, V, nx, ny, lo, hi, cx, cy){
@@ -1007,34 +1013,45 @@ function repaintHeat(){
   const rng=drawHeatmap(cv, gridState, zKey);
   const host=$('#heatMeta'); if(!host) return;
   if(!gridState){ host.innerHTML=''; return; }
-  const m=gridState.meta, moi=gridState.moi||{};
+  const m=gridState.meta, moi=gridState.moi||{}, isInd=m.mode==='inductogram';
   const lo=rng?rng.lo:null, hi=rng?rng.hi:null;
   const nvalid=(gridState.grid.VALID||[]).reduce((s,row)=>s+row.filter(Boolean).length,0);
   const stops=[0,.25,.5,.75,1].map(t=>ramp(t)).join(',');
+  const cbLabel = isInd ? ('|Aₑ| · '+zKey) : (zLabel(zKey)+' '+(zUnit(zKey)?'('+zUnit(zKey)+')':''));
+  const exc = isInd ? (m.excitations||[]).find(e=>e.label===zKey) : null;
   host.innerHTML=
     `<div class="cbar" style="background:linear-gradient(90deg,${stops})"></div>`+
-    `<div class="cbl"><span>${lo!=null?fmt(lo):'—'}</span><span>${zLabel(zKey)} ${zUnit(zKey)?'('+zUnit(zKey)+')':''}</span><span>${hi!=null?fmt(hi):'—'}</span></div>`+
+    `<div class="cbl"><span>${lo!=null?fmt(lo):'—'}</span><span>${cbLabel}</span><span>${hi!=null?fmt(hi):'—'}</span></div>`+
     `<div class="mrow"><span class="mk">Body</span><span>${m.body}</span></div>`+
     `<div class="mrow"><span class="mk">Grid</span><span>${m.nx} × ${m.ny}</span></div>`+
-    `<div class="mrow"><span class="mk">Valid</span><span>${nvalid} / ${m.nx*m.ny}</span></div>`+
+    (isInd
+      ? `<div class="mrow"><span class="mk">Excitation</span><span>${zKey}</span></div>`+
+        (exc&&exc.Texc_hr!=null?`<div class="mrow"><span class="mk">Period</span><span>${(+exc.Texc_hr).toFixed(2)} hr</span></div>`:'')
+      : `<div class="mrow"><span class="mk">Valid</span><span>${nvalid} / ${m.nx*m.ny}</span></div>`)+
     `<div class="mrow"><span class="mk">X · ${m.xName}</span><span>${fmt((gridState.axes.xData[0]||[])[0])}–${fmt((gridState.axes.xData[m.nx-1]||[])[0])}</span></div>`+
     `<div class="mrow"><span class="mk">Y · ${m.yName}</span><span>${fmt((gridState.axes.yData[0]||[])[0])}–${fmt((gridState.axes.yData[0]||[])[m.ny-1])}</span></div>`+
-    (moi.Cmeasured!=null?`<div class="mrow"><span class="mk">C/MR² obs</span><span>${(+moi.Cmeasured).toFixed(3)}±${(+moi.Cupper).toFixed(3)}</span></div>`:'');
+    (!isInd&&moi.Cmeasured!=null?`<div class="mrow"><span class="mk">C/MR² obs</span><span>${(+moi.Cmeasured).toFixed(3)}±${(+moi.Cupper).toFixed(3)}</span></div>`:'');
 }
 
 async function runGrid(){
   if(!backend){ openModal(); return; }
   const btn=$('#runGrid'), rl=$('#runGrid .rl');
-  const xk=$('#exX').value, yk=$('#exY').value;
-  if(xk===yk){ flashTool('#exNeeds','pick two different axes'); return; }
-  const n=+$('#exN').value;
+  const mode=$('#exMode').value, n=+$('#exN').value;
   const spec=await buildSpec();          // full body defaults + ocean/core
-  delete spec.run; spec.mode='exploreogram';
-  // clear single-run hydrosphere constraints that the sweep will set itself
+  delete spec.run;
   spec.bulk=spec.bulk||{}; spec.ocean=spec.ocean||{};
-  [xk,yk].forEach(k=>{ if(k==='Tb_K')delete spec.bulk.Tb_K; if(k==='zb_approximate_km')delete spec.bulk.zb_approximate_km; if(k==='wOcean_ppt')delete spec.ocean.wOcean_ppt; });
-  spec.explore={xName:xk,yName:yk,zName:SWEEP_Z.map(z=>z.k),
-    xRange:[+$('#exX0').value,+$('#exX1').value], yRange:[+$('#exY0').value,+$('#exY1').value], nx:n, ny:n};
+  if(mode==='inductogram'){
+    spec.mode='inductogram'; delete spec.explore;
+    spec.induct={nSigmaPts:n, nDpts:n};
+  } else {
+    const xk=$('#exX').value, yk=$('#exY').value;
+    if(xk===yk){ flashTool('#exNeeds','pick two different axes'); return; }
+    spec.mode='exploreogram';
+    // clear single-run hydrosphere constraints that the sweep will set itself
+    [xk,yk].forEach(k=>{ if(k==='Tb_K')delete spec.bulk.Tb_K; if(k==='zb_approximate_km')delete spec.bulk.zb_approximate_km; if(k==='wOcean_ppt')delete spec.ocean.wOcean_ppt; });
+    spec.explore={xName:xk,yName:yk,zName:SWEEP_Z.map(z=>z.k),
+      xRange:[+$('#exX0').value,+$('#exX1').value], yRange:[+$('#exY0').value,+$('#exY1').value], nx:n, ny:n};
+  }
   btn.disabled=true; btn.classList.add('running'); rl.textContent='Running '+n+'×'+n;
   try{
     const sub=await (await api('/runs',{method:'POST',body:JSON.stringify(spec)})).json();
@@ -1043,12 +1060,22 @@ async function runGrid(){
     const res=await (await api('/runs/'+sub.id+'/result')).json();
     if(!res.grid) throw new Error('no grid returned');
     gridState=res;
-    // populate z selector from what actually came back
-    const avail=res.meta.availableZ||SWEEP_Z.map(z=>z.k);
-    fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), $('#exZ').value||'D_km');
+    const avail=res.meta.availableZ||[];
+    if(mode==='inductogram'){
+      const def=avail.includes('synodic')?'synodic':avail[0];
+      fillSel('#exZ', avail.map(k=>[k, k]), def);
+    } else {
+      fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), avail.includes($('#exZ').value)?$('#exZ').value:'D_km');
+    }
     repaintHeat();
   }catch(e){ flashTool('#exNeeds', e.message||'sweep failed'); }
   finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Run sweep'; }
+}
+function toggleSweepMode(){
+  const induct=$('#exMode').value==='inductogram';
+  $$('#exploreSec .axcell').forEach(c=>c.hidden=induct);
+  $$('#exploreSec .indnote').forEach(c=>c.hidden=!induct);
+  $('#exZlab').textContent=induct?'Excitation':'Color by';
 }
 
 /* ---------------------------------------------------------------- inference */
@@ -1188,6 +1215,8 @@ function initTools(){
   $('#exX').addEventListener('change',()=>setRange('#exX','#exX0','#exX1'));
   $('#exY').addEventListener('change',()=>setRange('#exY','#exY0','#exY1'));
   $('#exZ').addEventListener('change', repaintHeat);
+  $('#exMode').addEventListener('change', toggleSweepMode);
+  toggleSweepMode();
   $('#runGrid').onclick=runGrid;
   $('#infArt').addEventListener('change', renderObsForm);
   $('#runInfer').onclick=runInfer;

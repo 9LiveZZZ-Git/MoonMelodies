@@ -109,8 +109,25 @@ def validate_request(spec, eosTables='discover'):
         if not _is_set(spec, 'bulk', 'qSurf_Wm2'):
             errors.append({'field': 'bulk.qSurf_Wm2', 'message': 'required when do.NO_H2O is true'})
 
-    # 4. Explore/grid axis enums.
-    if mode in GRID_MODES:
+    # 4a. Inductogram (sigma sweep): validate the induct block (uses ocean conductivity x
+    # thickness ranges from the per-body config; the request sets resolution + optional ranges).
+    if mode == 'inductogram':
+        ind = spec.get('induct')
+        if ind is not None and not isinstance(ind, dict):
+            errors.append({'field': 'induct', 'message': 'expected an object'})
+        elif isinstance(ind, dict):
+            for cnt in ('nSigmaPts', 'nDpts'):
+                v = ind.get(cnt)
+                if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v < 1):
+                    errors.append({'field': f'induct.{cnt}', 'message': 'must be a positive integer'})
+            for rng in ('sigmaRange', 'DRange'):
+                v = ind.get(rng)
+                if v is not None and (not isinstance(v, list) or len(v) != 2
+                                      or any(isinstance(x, bool) or not isinstance(x, (int, float)) for x in v)):
+                    errors.append({'field': f'induct.{rng}', 'message': 'must be a [min, max] numeric pair (log10)'})
+
+    # 4b. Explore/grid axis enums (exploreogram + montecarlo).
+    if mode in ('exploreogram', 'montecarlo'):
         ex = spec.get('explore')
         if not isinstance(ex, dict):
             errors.append({'field': 'explore', 'message': f'required for mode "{mode}"'})

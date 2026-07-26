@@ -204,6 +204,43 @@ def apply_explore_params(spec, Params):
     return Params
 
 
+def apply_induct_params(spec, Params):
+    """ Populate Params.Induct from spec['induct'] for a sigma-type inductogram run.
+
+        The interactive API supports the 'sigma' inductOtype (ocean conductivity x
+        ocean-thickness induction response). The sweep ranges default to the per-body
+        induction config (log10-spaced sigma/D); the request may override the resolution
+        (nSigmaPts / nDpts) and, optionally, the log10 ranges and fixed ice thickness.
+        Mutates Params in place and returns it.
+    """
+    ind = spec.get('induct') or {}
+    if not isinstance(ind, dict):
+        raise MappingError([{'field': 'induct', 'message': 'expected an object'}])
+    if getattr(Params, 'Induct', None) is None:
+        raise MappingError([{'field': 'induct', 'message': 'server Induct config is unavailable'}])
+    body = spec.get('body')
+    I = Params.Induct
+    I.inductOtype = 'sigma'                       # only sigma is served through the API
+    if 'nSigmaPts' in ind:
+        I.nSigmaPts = int(ind['nSigmaPts'])
+    if 'nDpts' in ind:
+        I.nDpts = int(ind['nDpts'])
+    # Optional log10-range / fixed-zb overrides; otherwise the per-body config is used.
+    if 'sigmaRange' in ind and isinstance(ind['sigmaRange'], (list, tuple)) and len(ind['sigmaRange']) == 2:
+        I.sigmaMin[body], I.sigmaMax[body] = float(ind['sigmaRange'][0]), float(ind['sigmaRange'][1])
+    if 'DRange' in ind and isinstance(ind['DRange'], (list, tuple)) and len(ind['DRange']) == 2:
+        I.Dmin[body], I.Dmax[body] = float(ind['DRange'][0]), float(ind['DRange'][1])
+    if 'zbFixed_km' in ind:
+        I.zbFixed_km[body] = float(ind['zbFixed_km'])
+    # Bodies without a config entry fall back to sane Europa-like defaults so the run
+    # can't KeyError deep in the engine.
+    for d, default in ((I.sigmaMin, -1.0), (I.sigmaMax, 2.0), (I.Dmin, 0.0), (I.Dmax, 2.3),
+                       (I.zbFixed_km, 20.0)):
+        if body not in d:
+            d[body] = default
+    return Params
+
+
 def neutralize_induction(Params):
     """ Set every Params.Induct.excSelectionCalc flag False so grid extraction skips the
         induction path (Benm2absBexyz dereferences None when moments weren't computed). """

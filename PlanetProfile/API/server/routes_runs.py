@@ -40,14 +40,24 @@ async def submit(request: Request):
     mode = spec.get('mode') or 'single'
     mode = mode.lower() if isinstance(mode, str) else 'single'
     if mode in _GRID_MODES:
-        ex = spec.get('explore') or {}
-        try:
-            cells = int(ex.get('nx', 0) or 0) * int(ex.get('ny', 0) or 0)
-        except (TypeError, ValueError):
-            cells = 0
-            errors.append({'field': 'explore', 'message': 'nx and ny must be integers'})
+        if mode == 'inductogram':
+            ind = spec.get('induct') or {}
+            field = 'induct'
+            try:
+                cells = int(ind.get('nSigmaPts', 40) or 40) * int(ind.get('nDpts', 50) or 50)
+            except (TypeError, ValueError):
+                cells = 0
+                errors.append({'field': 'induct', 'message': 'nSigmaPts and nDpts must be integers'})
+        else:
+            ex = spec.get('explore') or {}
+            field = 'explore'
+            try:
+                cells = int(ex.get('nx', 0) or 0) * int(ex.get('ny', 0) or 0)
+            except (TypeError, ValueError):
+                cells = 0
+                errors.append({'field': 'explore', 'message': 'nx and ny must be integers'})
         if cells > cfg.max_grid_cells:
-            errors.append({'field': 'explore',
+            errors.append({'field': field,
                            'message': f'grid {cells} cells exceeds cap {cfg.max_grid_cells}'})
     if errors:
         raise HTTPException(status_code=422, detail=errors)

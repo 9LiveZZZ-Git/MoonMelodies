@@ -1793,6 +1793,67 @@ def RunExploreGrid(Planet, Params):
     return Exploration, Params
 
 
+def RunInductGrid(Planet, Params):
+    """ Run a sigma-type InductOgram (ocean conductivity x ocean-thickness induction
+        response) from an already-built base Planet, without importing a user file.
+
+        Only the 'sigma' inductOtype is supported through this entry point: each grid cell
+        is a 3-layer conducting sphere (ice / ocean sigma / rock), so no per-cell interior
+        model is run and the sweep is fast -- which is what the interactive API path needs.
+        Mirrors the sigma branch of InductOgram; returns the InductionResultsStruct plus the
+        mutated Params. Assumes Params.Induct (inductOtype, nSigmaPts, nDpts, and the per-body
+        sigmaMin/Max, Dmin/Max, zbFixed_km) is populated.
+    """
+    bodyname = Planet.name
+    if Params.Induct.inductOtype != 'sigma':
+        raise ValueError(f"RunInductGrid supports only inductOtype 'sigma' (got '{Params.Induct.inductOtype}').")
+    # The base model isn't run here, so default the multipole orders the way a PP inductogram
+    # input file would (uniform applied field, spherically symmetric).
+    if Planet.Magnetic.nprmMax is None:
+        Planet.Magnetic.nprmMax = 1
+    if Planet.Magnetic.pMax is None:
+        Planet.Magnetic.pMax = 0
+    Params.CALC_CONDUCT = True
+    Planet, Params = SetupInduction(Planet, Params)
+
+    sigmaList = np.logspace(Params.Induct.sigmaMin[bodyname], Params.Induct.sigmaMax[bodyname], Params.Induct.nSigmaPts)
+    Dlist = np.logspace(Params.Induct.Dmin[bodyname], Params.Induct.Dmax[bodyname], Params.Induct.nDpts)
+    Params.nModels = Params.Induct.nSigmaPts * Params.Induct.nDpts
+
+    InductionResults = InductionResultsStruct()
+    InductionResults.xData = sigmaList
+    InductionResults.yData = Dlist
+    Planet.zb_km = Params.Induct.zbFixed_km[bodyname]
+    Planet.Magnetic.rSigChange_m = np.array([0, Planet.Bulk.R_m - Planet.zb_km * 1e3, Planet.Bulk.R_m])
+    sigIce = Planet.Ocean.sigmaIce_Sm['Ih'] if isinstance(Planet.Ocean.sigmaIce_Sm, dict) else Planet.Ocean.sigmaIce_Sm
+    Planet.Magnetic.sigmaLayers_Sm = np.array([sigIce, 0, Planet.Sil.sigmaSil_Sm])
+    PlanetGrid = np.empty((Params.Induct.nSigmaPts, Params.Induct.nDpts), dtype=object)
+    k = 1
+    for i, sigma_Sm in enumerate(sigmaList):
+        for j, D_km in enumerate(Dlist):
+            Planet.Sil.rhoMean_kgm3 = Planet.Sil.rhoSilWithCore_kgm3
+            Planet.Sil.phiRockMax_frac = 0
+            Planet.Ocean.sigmaMean_Sm = sigma_Sm
+            Planet.Ocean.sigmaTop_Sm = sigma_Sm
+            Planet.Ocean.Tmean_K = Constants.T0
+            Planet.Magnetic.sigmaLayers_Sm[1] = sigma_Sm
+            Planet.D_km = D_km
+            Planet.Magnetic.rSigChange_m[0] = Planet.Bulk.R_m - 1e3 * (D_km + Planet.zb_km)
+            Planet.index = k
+            k += 1
+            PlanetGrid[i, j] = deepcopy(Planet)
+
+    Params.INDUCTOGRAM_IN_PROGRESS = True
+    PlanetGrid = ParPlanet(PlanetGrid, Params)
+    Params.INDUCTOGRAM_IN_PROGRESS = False
+
+    InductionResults = ExtractResults(InductionResults, PlanetGrid, Params)
+    InductionResults.oceanComp = InductionResults.base.oceanComp
+    InductionResults.SetAxes(Params.Induct.inductOtype)
+    InductionResults.SetComps(Params.Induct.inductOtype)
+    return InductionResults, Params
+
+
 def ExploreOgram(bodyname, Params, fNameOverride=None, RETURN_GRID=False, Magnetic=None):
     """ Run PlanetProfile models over a variety of settings to get interior
         properties for each input.

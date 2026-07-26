@@ -97,6 +97,35 @@ def _run_exploreogram(spec, jobdir, jobid, engine, pristineParams, emit):
             'manifest': manifest}
 
 
+def _run_inductogram(spec, jobdir, jobid, engine, pristineParams, emit):
+    """ mode=inductogram: run a sigma-type induction sweep (ocean conductivity x thickness)
+        and serialize the per-excitation response grid. Uses the importlib-free engine entry
+        point RunInductGrid; single-process for the same nested-Pool reason as exploreogram.
+    """
+    from PlanetProfile.API import mapper, results as resultsmod
+
+    Params = mapper.apply_run_flags(spec, pristineParams)   # sets DO_INDUCTOGRAM from mode
+    Params = mapper.apply_induct_params(spec, Params)
+    Params.DO_PARALLEL = False
+    Planet = mapper.build_planet(spec)
+
+    os.chdir(jobdir)
+    emit({'type': 'progress', 'id': jobid, 'stage': 'induction', 'percent': 5})
+    InductionResults, Params = engine.RunInductGrid(Planet, Params)
+    emit({'type': 'progress', 'id': jobid, 'stage': 'write', 'percent': 95})
+
+    manifest = resultsmod.build_manifest(jobdir)
+    result = resultsmod.extract_induct_grid(InductionResults, Params, manifest=manifest)
+    resultsmod.write_result_json(result, jobdir)
+
+    return {'type': 'result', 'id': jobid, 'status': 'succeeded',
+            'summary': {'mode': 'inductogram', 'nx': result['meta']['nx'],
+                        'ny': result['meta']['ny'],
+                        'nExcitations': len(result['meta']['excitations'])},
+            'meta': result['meta'],
+            'manifest': manifest}
+
+
 def run_job(spec, jobdir, jobid, engine, pristineParams, emit=_emit):
     """ Run a single job in jobdir and return the terminal result dict (also emitted).
 
@@ -121,10 +150,12 @@ def run_job(spec, jobdir, jobid, engine, pristineParams, emit=_emit):
             return _run_single(spec, jobdir, jobid, engine, pristineParams, emit)
         if mode == 'exploreogram':
             return _run_exploreogram(spec, jobdir, jobid, engine, pristineParams, emit)
+        if mode == 'inductogram':
+            return _run_inductogram(spec, jobdir, jobid, engine, pristineParams, emit)
         return {'type': 'result', 'id': jobid, 'status': 'failed',
                 'error': {'code': 'unsupported_mode',
                           'message': f'mode "{mode}" is not handled by the worker '
-                                     '(supported: single, exploreogram)'}}
+                                     '(supported: single, exploreogram, inductogram)'}}
     except mapper.MappingError as e:
         return {'type': 'result', 'id': jobid, 'status': 'failed',
                 'error': {'code': 'mapping_error', 'message': 'request references disallowed attributes',
