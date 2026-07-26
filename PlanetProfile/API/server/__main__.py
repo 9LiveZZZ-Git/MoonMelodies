@@ -4,6 +4,14 @@ Must be started from a config root that has a seeded ``UserConfigs/`` (run
 ``python -m PlanetProfile.install`` first), so the worker imports don't block on the
 import-time stdin prompt.
 """
+import os
+# The server process hosts torch for amortized inference (via PlanetProfile.API.inference ->
+# sbi_runner). Allow the duplicate libomp load before torch is first imported. This is safe
+# here: the uvicorn process never imports the forward interior engine (that lives in the
+# separate ppworker subprocesses), so the libomp double-init hazard the CLAUDE.md flags for
+# in-process dataset-generation + training does not arise on this path.
+os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
+
 import sys
 import logging
 

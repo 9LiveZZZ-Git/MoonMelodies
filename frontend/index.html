@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoonMelodies — interior cross-section plate</title>
+<style>
+/* ============================================================================
+   MoonMelodies — RADIAL PLATE, engineering cross-section.
+   Light theme only. A to-scale radial disc drawn on graph paper, dimensioned
+   with hairline leader lines out to margin callouts. One saturated interior
+   tone (ocean blue), one accent (signal red) reserved for the live
+   registration value. Type = Swiss caps for labels, tabular mono for measures.
+   ========================================================================== */
+:root{
+  --paper:#FFFFFF; --field:#FCFCFB;
+  --grid:#EEF0F1; --grid2:#E4E7E9;
+  --ink:#22242A; --hair:rgba(34,36,42,.12); --hair2:rgba(34,36,42,.28);
+  --ice:#DBE4EA; --hpice:#C7D6DF; --ocean:#6E92A8; --mantle:#B9AE9E; --core:#22242A;
+  --red:#E4322B;
+  --hi:#F3F6F7;
+  --display:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper); color:var(--ink);
+  font:14px/1.5 var(--display); -webkit-font-smoothing:antialiased;
+  font-variant-numeric:tabular-nums;}
+.mono{font-family:var(--mono)}
+.tnum{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--red); outline-offset:2px}
+
+.wrap{max-width:1040px; margin:0 auto; padding:28px clamp(16px,4vw,40px) 80px}
+
+/* ---- masthead ----------------------------------------------------------- */
+.masthead{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; padding-top:4px}
+h1#bodyName{margin:0; font:800 clamp(28px,5.4vw,48px)/1 var(--display); letter-spacing:-.01em; text-transform:uppercase}
+#bodyName small{font:500 .32em/1 var(--mono); letter-spacing:.03em; text-transform:uppercase; opacity:.5; margin-left:12px; white-space:nowrap}
+.status{display:inline-flex; align-items:center; gap:8px; background:none; border:0; cursor:pointer;
+  font:11px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink); padding:6px 2px}
+.status .dot{width:8px; height:8px; border-radius:50%; background:var(--ink); flex:none}
+.status[data-s="sample"]{opacity:.5}
+.status[data-s="sample"] .dot{background:transparent; box-shadow:inset 0 0 0 1.4px var(--ink)}
+.status[data-s="busy"] .dot{background:var(--red)}
+.status[data-s="busy"]{opacity:1}
+.dbl{margin:16px 0 6px; border-top:1px solid var(--hair); position:relative}
+.dbl::after{content:""; position:absolute; left:0; right:0; top:3px; border-top:1px solid var(--hair)}
+
+/* ---- control band ------------------------------------------------------- */
+.control{display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px 26px; padding:14px 0 4px}
+.cell{display:flex; flex-direction:column; gap:7px}
+.clab{font:600 10px var(--display); letter-spacing:.14em; text-transform:uppercase; color:var(--ink); opacity:.6}
+select,.con .val input,.card input{font:13px var(--mono); color:var(--ink); background:var(--paper);
+  border:1px solid var(--hair2); border-radius:2px; padding:8px 10px; -webkit-appearance:none; appearance:none}
+select{padding-right:26px; cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+  background-position:calc(100% - 14px) 15px,calc(100% - 9px) 15px; background-size:5px 5px,5px 5px; background-repeat:no-repeat}
+
+.tri{display:flex; gap:8px; flex-wrap:wrap}
+.con{display:inline-flex; align-items:center; gap:9px; border:1px solid var(--hair2); background:var(--paper);
+  padding:7px 11px; border-radius:2px; cursor:pointer; font:inherit; color:var(--ink)}
+.con .pip{width:9px; height:9px; border-radius:50%; border:1.4px solid var(--ink); opacity:.35; flex:none}
+.con[aria-pressed="true"]{border-color:var(--ink)}
+.con[aria-pressed="true"] .pip{background:var(--red); border-color:var(--red); opacity:1}
+.con .name{font:600 11px var(--display); letter-spacing:.06em; text-transform:uppercase}
+.con .val input{width:66px; text-align:right; padding:5px 7px; font-size:12px}
+.con[aria-pressed="false"] .val input{opacity:.35}
+.tri-note{font:11px var(--mono); letter-spacing:.04em; margin-top:2px; color:var(--ink); opacity:.55}
+.tri-note.err{color:var(--red); opacity:1}
+
+.tog{display:inline-flex; align-items:center; gap:9px; cursor:pointer;
+  font:600 11px var(--display); letter-spacing:.08em; text-transform:uppercase; color:var(--ink); padding:8px 0}
+.tog input{position:absolute; opacity:0; width:0; height:0}
+.tog .sw{width:30px; height:16px; border:1px solid var(--hair2); border-radius:2px; position:relative; background:var(--paper); flex:none}
+.tog .sw::after{content:""; position:absolute; top:1px; left:1px; width:12px; height:12px; background:var(--ink); opacity:.32; transition:.15s}
+.tog input:checked+.sw::after{left:15px; opacity:1}
+.tog input:focus-visible+.sw{outline:2px solid var(--red); outline-offset:2px}
+
+.compute{display:inline-flex; align-items:center; gap:9px; border:1px solid var(--ink); background:var(--paper); color:var(--ink);
+  font:600 12px var(--display); letter-spacing:.12em; text-transform:uppercase; padding:11px 20px; border-radius:2px; cursor:pointer; transition:background .12s,color .12s}
+.compute:hover{background:var(--ink); color:var(--paper)}
+.compute[disabled],.compute.running{color:var(--red); border-color:var(--red); background:var(--paper); cursor:default}
+.compute .arw{font-size:13px}
+
+/* ---- plate -------------------------------------------------------------- */
+.plate{margin-top:6px}
+.canvasbox{position:relative; width:100%; aspect-ratio:3/2}
+@media(max-width:620px){ .canvasbox{aspect-ratio:1/1} }
+canvas{display:block; width:100%; height:100%}
+
+/* narrow-screen callout list (reflow of the leader lines) */
+.legend{display:none}
+@media(max-width:620px){ .legend{display:block; margin-top:12px} }
+.lrow{display:flex; align-items:center; gap:11px; padding:9px 4px; border-bottom:1px solid var(--hair); cursor:default}
+.lrow:first-child{border-top:1px solid var(--hair)}
+.lsw{width:11px; height:11px; flex:none; box-shadow:inset 0 0 0 1px var(--hair2)}
+.lk{flex:1; font:600 11px var(--display); letter-spacing:.08em; text-transform:uppercase}
+.lv{font:12px var(--mono)}
+.lrow.on{background:var(--hi)}
+
+/* compute stage rail */
+.rail{display:none; flex-wrap:wrap; gap:5px; margin-top:12px}
+.rail.show{display:flex}
+.st{font:9.5px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); opacity:.28;
+  padding:3px 8px; border:1px solid transparent}
+.st.done{opacity:.6}
+.st.active{opacity:1; color:var(--red); border-color:var(--red)}
+
+/* ---- below: profile + readouts ------------------------------------------ */
+.below{display:grid; grid-template-columns:1fr 1fr; gap:26px 44px; margin-top:26px}
+@media(max-width:620px){ .below{grid-template-columns:1fr} }
+.kick{font:600 10px var(--display); letter-spacing:.16em; text-transform:uppercase; color:var(--ink); opacity:.6; margin-bottom:10px}
+.kick .prov{font-weight:400; letter-spacing:.06em; opacity:.7; margin-left:6px}
+.chips{display:flex; gap:6px; margin-bottom:8px}
+.chip{font:600 9.5px var(--display); letter-spacing:.1em; text-transform:uppercase; border:1px solid var(--hair2); background:var(--paper);
+  color:var(--ink); padding:4px 10px; border-radius:2px; cursor:pointer; opacity:.55}
+.chip.on{opacity:1; border-color:var(--ink)}
+.profbox{height:150px; position:relative}
+
+.rrow{display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:9px 3px; border-bottom:1px solid var(--hair)}
+.rrow:first-child{border-top:1px solid var(--hair)}
+.rrow.on{background:var(--hi)}
+.rk{font:600 10.5px var(--display); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); opacity:.7}
+.rv{font:14px var(--mono); color:var(--ink)}
+.rv u{text-decoration:none; opacity:.4; font-size:.72em; margin-left:4px}
+.ul{border-bottom:2px solid var(--red); padding-bottom:1px}
+
+footer{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:44px; padding-top:14px; border-top:1px solid var(--hair);
+  font:10px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink); opacity:.5}
+
+/* ---- connect modal ------------------------------------------------------ */
+.modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(34,36,42,.35); z-index:50; padding:16px}
+.modal.show{display:flex}
+.card{background:var(--paper); border:1px solid var(--ink); max-width:470px; width:100%; padding:26px}
+.card h2{margin:0 0 6px; font:700 18px var(--display); letter-spacing:-.01em; text-transform:uppercase}
+.card p{margin:0 0 16px; color:var(--ink); opacity:.7; font-size:13.5px}
+.card pre{font:11px/1.7 var(--mono); background:var(--field); border:1px solid var(--hair2); padding:12px; overflow:auto; color:var(--ink)}
+.card .field{margin:14px 0}
+.card .field .clab{margin-bottom:6px; display:block}
+.card input{width:100%}
+.card .actions{display:flex; align-items:center; gap:10px; margin-top:18px}
+.btn{font:600 11px var(--display); letter-spacing:.1em; text-transform:uppercase; border:1px solid var(--ink); background:var(--paper); color:var(--ink); padding:11px 16px; cursor:pointer; border-radius:2px}
+.btn.primary{background:var(--ink); color:var(--paper)}
+.spacer{flex:1}
+
+/* ---- figure suite ------------------------------------------------------- */
+#figures{margin-top:6px}
+.fsec{margin-top:32px}
+.fhead{font:700 11px var(--display); letter-spacing:.16em; text-transform:uppercase; color:var(--ink);
+  padding-bottom:8px; border-bottom:1px solid var(--ink); margin-bottom:16px}
+.fgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(228px,1fr)); gap:22px 24px}
+.fgrid.two{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.fig{margin:0}
+figcaption{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:7px}
+.ft{font:600 10.5px var(--display); letter-spacing:.09em; text-transform:uppercase; color:var(--ink)}
+.fu{font:9.5px var(--mono); letter-spacing:.04em; color:var(--ink); opacity:.45}
+.figbox{position:relative; height:152px; border:1px solid var(--hair); background:var(--field)}
+.figbox canvas{display:block; width:100%; height:100%}
+.extras{margin-top:34px}
+
+/* ---- advanced tools: sweep + inference ---------------------------------- */
+.tool{margin-top:40px}
+.tool .fhead{border-bottom:1px solid var(--ink)}
+.toolctl{display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 24px; padding:6px 0 16px}
+.toolctl .cell{gap:6px}
+.rng{display:flex; align-items:center; gap:6px}
+.rng input{width:64px; text-align:right}
+.rng .dash{opacity:.4; font:12px var(--mono)}
+.needs{font:11px var(--mono); letter-spacing:.04em; color:var(--ink); opacity:.55; padding:14px 0}
+.needs b{font-weight:600; opacity:.85}
+
+/* heatmap */
+.heatwrap{display:grid; grid-template-columns:1fr 210px; gap:24px}
+@media(max-width:720px){ .heatwrap{grid-template-columns:1fr} }
+.heatbox{aspect-ratio:auto; height:360px; border:1px solid var(--hair); background:var(--field)}
+.heatmeta{display:flex; flex-direction:column; gap:0}
+.heatmeta .mrow{display:flex; justify-content:space-between; gap:12px; padding:8px 2px; border-bottom:1px solid var(--hair); font:11px var(--mono)}
+.heatmeta .mrow:first-child{border-top:1px solid var(--hair)}
+.heatmeta .mk{opacity:.6; text-transform:uppercase; letter-spacing:.08em; font-size:10px; font-family:var(--display); font-weight:600}
+.heatmeta .cbar{height:12px; margin:14px 0 4px; border:1px solid var(--hair2)}
+.heatmeta .cbl{display:flex; justify-content:space-between; font:9.5px var(--mono); opacity:.55}
+
+/* corner plot + summary */
+.cornerwrap{display:grid; grid-template-columns:minmax(0,1fr) 268px; gap:24px; align-items:start}
+@media(max-width:820px){ .cornerwrap{grid-template-columns:1fr} }
+.cornerbox{aspect-ratio:1/1; width:100%; border:1px solid var(--hair); background:var(--field)}
+.obsform{display:flex; flex-wrap:wrap; gap:10px 16px; padding:2px 0 16px}
+.ofield{display:flex; flex-direction:column; gap:5px}
+.ofield label{font:600 10px var(--display); letter-spacing:.08em; text-transform:uppercase; opacity:.62}
+.ofield input{width:104px; text-align:right; font:12px var(--mono); color:var(--ink); background:var(--paper); border:1px solid var(--hair2); border-radius:2px; padding:6px 8px}
+.ofield .sig{font:9px var(--mono); opacity:.45}
+.ofield.locked input{opacity:.5}
+.summtab{display:flex; flex-direction:column}
+.summtab .sh{font:600 10px var(--display); letter-spacing:.1em; text-transform:uppercase; opacity:.6; padding-bottom:6px; border-bottom:1px solid var(--ink)}
+.srow{display:grid; grid-template-columns:1fr auto; gap:6px 10px; padding:7px 2px; border-bottom:1px solid var(--hair); align-items:baseline}
+.srow .sp{font:11px var(--mono)}
+.srow .sv{font:11.5px var(--mono); text-align:right}
+.srow .su{font:9px var(--mono); opacity:.4; margin-left:3px}
+.scope{font:11px/1.6 var(--mono); color:var(--ink); opacity:.68; border-left:2px solid var(--ocean); padding:6px 0 6px 12px; margin:2px 0 14px}
+.guards{margin-top:14px; display:flex; flex-direction:column; gap:6px}
+.gban{font:10.5px/1.5 var(--mono); letter-spacing:.02em; color:var(--ink); background:var(--field); border:1px solid var(--hair2); border-left:2px solid var(--red); padding:8px 12px}
+.gban.ok{border-left-color:var(--ocean)}
+
+@media(prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <h1 id="bodyName">Europa <small id="bodyR">R 1560.8 km</small></h1>
+    <button class="status" id="statusChip" data-s="sample" aria-label="Backend connection">
+      <span class="dot"></span><span id="statusText">disconnected · sample</span>
+    </button>
+  </header>
+  <div class="dbl" aria-hidden="true"></div>
+
+  <div class="control">
+    <div class="cell">
+      <span class="clab">Body</span>
+      <select id="body" aria-label="Body"></select>
+    </div>
+
+    <div class="cell">
+      <span class="clab">Constrain · 2 of 3</span>
+      <div class="tri" id="tri">
+        <button class="con" data-k="Tb" aria-pressed="true">
+          <span class="pip" aria-hidden="true"></span>
+          <span class="name">T<sub>b</sub></span>
+          <span class="val"><input class="mono tnum" data-k="Tb" value="268.3" inputmode="decimal" aria-label="Tb ice-base temperature, K"></span>
+        </button>
+        <button class="con" data-k="zb" aria-pressed="false">
+          <span class="pip" aria-hidden="true"></span>
+          <span class="name">d_ice</span>
+          <span class="val"><input class="mono tnum" data-k="zb" value="30.0" inputmode="decimal" aria-label="ice thickness, km"></span>
+        </button>
+        <button class="con" data-k="w" aria-pressed="true">
+          <span class="pip" aria-hidden="true"></span>
+          <span class="name">Salinity</span>
+          <span class="val"><input class="mono tnum" data-k="w" value="35.2" inputmode="decimal" aria-label="salinity, ppt"></span>
+        </button>
+      </div>
+      <div class="tri-note" id="triNote">the third is solved for</div>
+    </div>
+
+    <div class="cell">
+      <span class="clab">Ocean comp</span>
+      <select id="ocean" aria-label="Ocean composition">
+        <option>Seawater</option><option>MgSO4</option><option>PureH2O</option><option>NaCl</option>
+      </select>
+    </div>
+
+    <div class="cell">
+      <span class="clab">Interior</span>
+      <label class="tog"><input type="checkbox" id="core" checked><span class="sw"></span>Fe core</label>
+    </div>
+
+    <div class="cell">
+      <span class="clab">&nbsp;</span>
+      <button class="compute" id="run"><span class="rl">Compute</span><span class="arw" aria-hidden="true">&#9656;</span></button>
+    </div>
+  </div>
+
+  <section class="plate" aria-label="Interior cross-section plate">
+    <div class="canvasbox">
+      <canvas id="cut" aria-label="To-scale radial cross-section of the selected body"></canvas>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="rail" id="rail"></div>
+  </section>
+
+  <div class="below">
+    <div class="profwrap">
+      <div class="kick">Radial profile · surface &rarr; center</div>
+      <div class="chips" id="chips">
+        <button class="chip on" data-q="rho">Density</button>
+        <button class="chip" data-q="T">Temp</button>
+        <button class="chip" data-q="P">Pressure</button>
+      </div>
+      <div class="profbox"><canvas id="prof"></canvas></div>
+    </div>
+    <div class="readwrap">
+      <div class="kick">Readouts <span class="prov" id="prov">sample model</span></div>
+      <div class="reads" id="reads"></div>
+    </div>
+  </div>
+
+  <section id="figures" aria-label="Model figures"></section>
+
+  <!-- ExploreOgram: 2-D parameter sweep -->
+  <section class="tool" id="exploreSec" aria-label="Two-parameter sweep">
+    <div class="fhead">2-D parameter sweep · ExploreOgram</div>
+    <div class="toolctl">
+      <div class="cell"><span class="clab">X axis</span>
+        <select id="exX" aria-label="Sweep X parameter"></select>
+        <div class="rng"><input id="exX0" class="mono tnum" inputmode="decimal" aria-label="X min"><span class="dash">–</span><input id="exX1" class="mono tnum" inputmode="decimal" aria-label="X max"></div></div>
+      <div class="cell"><span class="clab">Y axis</span>
+        <select id="exY" aria-label="Sweep Y parameter"></select>
+        <div class="rng"><input id="exY0" class="mono tnum" inputmode="decimal" aria-label="Y min"><span class="dash">–</span><input id="exY1" class="mono tnum" inputmode="decimal" aria-label="Y max"></div></div>
+      <div class="cell"><span class="clab">Grid</span>
+        <select id="exN" aria-label="Grid resolution"><option value="5">5 × 5</option><option value="7">7 × 7</option><option value="9">9 × 9</option></select></div>
+      <div class="cell"><span class="clab">Color by</span><select id="exZ" aria-label="Colour field"></select></div>
+      <div class="cell"><span class="clab">&nbsp;</span><button class="compute" id="runGrid"><span class="rl">Run sweep</span><span class="arw" aria-hidden="true">&#9656;</span></button></div>
+    </div>
+    <div class="needs" id="exNeeds" hidden><b>Connect the engine</b> to run a live sweep — each grid cell is a full interior model.</div>
+    <div class="heatwrap">
+      <div class="canvasbox heatbox"><canvas id="heat" aria-label="Sweep heatmap"></canvas></div>
+      <div class="heatmeta" id="heatMeta"></div>
+    </div>
+  </section>
+
+  <!-- Bayesian inference -->
+  <section class="tool" id="inferSec" aria-label="Amortized Bayesian inference">
+    <div class="fhead">Bayesian inference · amortized SBI</div>
+    <div class="toolctl">
+      <div class="cell"><span class="clab">Trained posterior</span><select id="infArt" aria-label="Inference artifact"></select></div>
+      <div class="cell"><span class="clab">Draws</span><select id="infN" aria-label="Posterior draws"><option>3000</option><option selected>10000</option><option>20000</option></select></div>
+      <div class="cell"><span class="clab">&nbsp;</span><button class="compute" id="runInfer"><span class="rl">Sample posterior</span><span class="arw" aria-hidden="true">&#9656;</span></button></div>
+    </div>
+    <div class="needs" id="infNeeds" hidden><b>Connect the engine</b> to sample the downloaded posteriors.</div>
+    <div class="scope" id="infScope" hidden></div>
+    <div class="obsform" id="obsForm"></div>
+    <div class="cornerwrap">
+      <div class="canvasbox cornerbox"><canvas id="corner" aria-label="Posterior corner plot"></canvas></div>
+      <div class="summtab" id="summTab"></div>
+    </div>
+    <div class="guards" id="infGuards"></div>
+  </section>
+
+  <footer>
+    <span>MoonMelodies · engineering cross-section · a fork of PlanetProfile</span>
+    <span id="engine">client-side render</span>
+  </footer>
+</div>
+
+<!-- connect modal -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Connect to local engine">
+  <div class="card">
+    <h2>Connect the engine</h2>
+    <p>Models are computed by the MoonMelodies backend on your machine. Start it, then paste its address and session token.</p>
+    <pre>python -m PlanetProfile.install        # once
+python -m PlanetProfile.API.server</pre>
+    <div class="field"><span class="clab">Backend URL</span><input id="url" class="mono" value="http://127.0.0.1:8787"></div>
+    <div class="field"><span class="clab">Session token</span><input id="tok" class="mono" placeholder="printed at startup"></div>
+    <div class="tri-note err" id="connErr" style="display:none"></div>
+    <div class="actions">
+      <button class="btn" id="useSample">Use sample data</button>
+      <span class="spacer"></span>
+      <button class="btn primary" id="doConnect">Connect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* Gravity Love numbers flow live when the ALMA backend is calibrated; until then the
+   physicality guard in fromResult() falls back to the per-body reference envelope. */
+const GRAVITY_LIVE=true;
+/* ------------------------------------------------------ palette / phases */
+const INK='#22242A';
+const INKa=a=>`rgba(34,36,42,${a})`;
+const PHASE = { // engine phase-id -> layer identity (light plate tints)
+  0:{name:'Ocean',           tag:'liquid H₂O', grp:'ocean',  c:'#6E92A8'},
+  1:{name:'Ice shell',       tag:'ice Ih',     grp:'ice',    c:'#DBE4EA'},
+  2:{name:'HP ice II',       tag:'HP ice',     grp:'hpice',  c:'#D0DDE5'},
+  3:{name:'HP ice III',      tag:'HP ice',     grp:'hpice',  c:'#CBD9E2'},
+  5:{name:'HP ice V',        tag:'HP ice',     grp:'hpice',  c:'#C5D5DF'},
+  6:{name:'HP ice VI',       tag:'HP ice',     grp:'hpice',  c:'#BFD1DC'},
+  30:{name:'Clathrate',      tag:'sI clath',   grp:'ice',    c:'#D6E2DC'},
+  50:{name:'Silicate mantle',tag:'rock',       grp:'mantle', c:'#B9AE9E'},
+  100:{name:'Iron core',     tag:'Fe / FeS',   grp:'core',   c:'#22242A'},
+  105:{name:'Iron core',     tag:'Fe / FeS',   grp:'core',   c:'#22242A'},
+  115:{name:'Iron core',     tag:'Fe / FeS',   grp:'core',   c:'#22242A'},
+};
+const pOf = ph => PHASE[ph] || PHASE[50];
+const GRP_NAME={ice:'ICE SHELL', hpice:'HP ICE', ocean:'OCEAN', mantle:'SILICATE MANTLE', core:'IRON CORE'};
+const GRP_COLOR={ice:'#DBE4EA', hpice:'#C7D6DF', ocean:'#6E92A8', mantle:'#B9AE9E', core:'#22242A'};
+const nameOf=g=>GRP_NAME[g]||g.toUpperCase();
+
+/* ---------------------------------------------------- sample worlds (km, SI) */
+// representative per-group properties for the SAMPLE view only (rough, plausible).
+const PV={
+  ocean: {rho:1060,Cp:3900,al:2.6e-4,kT:0.6,VP:1.5,VS:0,  QS:1e4,KS:2.2,GS:0, eta:1,   Ht:0},
+  ice:   {rho:925, Cp:2000,al:1.6e-4,kT:2.4,VP:3.4,VS:1.9,QS:200,KS:9.3,GS:3.5,eta:1e14,Ht:0},
+  hpice: {rho:1250,Cp:2200,al:1.3e-4,kT:2.2,VP:4.2,VS:2.1,QS:250,KS:14, GS:5,  eta:1e15,Ht:0},
+  mantle:{rho:3380,Cp:1050,al:2.4e-5,kT:3.6,VP:7.6,VS:4.3,QS:600,KS:127,GS:68, eta:1e21,Ht:1e-10},
+  core:  {rho:5500,Cp:800, al:1.2e-5,kT:30, VP:5.6,VS:2.9,QS:1e4,KS:150,GS:80, eta:1e9, Ht:0},
+};
+function world(R, shells, stats){
+  const N=220, R_m=R*1000, L={r_m:[],phase:[],rho_kgm3:[],T_K:[],P_MPa:[],g_ms2:[],Cp_JkgK:[],
+    alpha_pK:[],kTherm_WmK:[],sigma_Sm:[],phi_frac:[],VP_kms:[],VS_kms:[],QS:[],KS_GPa:[],GS_GPa:[],eta_Pas:[],Htidal_Wm3:[]};
+  const rcoreFrac=(stats.core||0)/R, sig=stats.sig&&stats.sig!=='—'?+stats.sig:2.5;
+  for(let i=0;i<N;i++){
+    const r=R*(1-i/(N-1)), rf=r/R, df=1-rf; let ph=115;
+    for(let j=shells.length-1;j>=0;j--){ if(r<=shells[j].r){ ph=shells[j].ph; break; } }
+    if(r>shells[0].r) ph=shells[0].ph;
+    const grp=pOf(ph).grp, v=PV[grp]||PV.mantle;
+    L.r_m.push(r*1000); L.phase.push(ph);
+    L.rho_kgm3.push(v.rho*(1+0.05*df));
+    L.T_K.push(stats.Tsurf+(stats.Tc-stats.Tsurf)*Math.pow(df,0.7));
+    L.P_MPa.push(stats.Pc*Math.pow(df,1.35));
+    // gravity rises inward through the mantle, falls ~linearly to 0 inside the core
+    L.g_ms2.push(rf>rcoreFrac ? 1.3*(1+0.35*(1-rf)) : 1.3*(1+0.35*(1-rcoreFrac))*(rf/(rcoreFrac||1)));
+    L.Cp_JkgK.push(v.Cp); L.alpha_pK.push(v.al); L.kTherm_WmK.push(v.kT);
+    L.sigma_Sm.push(grp==='ocean'?sig:v.sg??({ice:1e-8,hpice:1e-7,mantle:1e-4,core:1e6}[grp]||1e-6));
+    L.phi_frac.push(grp==='mantle'?0.02:0);
+    L.VP_kms.push(v.VP); L.VS_kms.push(v.VS); L.QS.push(v.QS);
+    L.KS_GPa.push(v.KS); L.GS_GPa.push(v.GS); L.eta_Pas.push(v.eta); L.Htidal_Wm3.push(v.Ht);
+  }
+  const k2=stats.k2&&stats.k2!=='—'?+stats.k2:null;
+  const grav = k2==null ? null : { k:{re:k2,im:-0.02*k2}, h:{re:k2*4.8,im:-0.03*k2*4.8}, l:{re:k2*1.2,im:-0.02},
+    kAmp:k2, hAmp:k2*4.8, lAmp:k2*1.2, kPhase:-1.2, libration_m:stats.lib||140 };
+  const induct = { calcedExc:['synodic','synodic 2nd','orbital'],
+    Texc_hr:[stats.Tsyn||11.23,(stats.Tsyn||11.23)/2,stats.Torbh||85.2],
+    Amp:[0.86,0.14,0.19], phase:[-24,-38,-61] };
+  return {R_m, shells, stats, layers:L, grav, induct};
+}
+const SAMPLES = {
+  Europa:  world(1560.8,[{r:1560.8,ph:1},{r:1530.8,ph:0},{r:1459.9,ph:50},{r:495,ph:105}],
+             {Tsurf:110,Tc:1300,Pc:5300,M:'4.80e22',CMR2:'0.346',ocean:71,ice:30,core:495,k2:'0.25',sig:'2.5'}),
+  Enceladus:world(252.1,[{r:252.1,ph:1},{r:230,ph:0},{r:190,ph:50},{r:0,ph:50}],
+             {Tsurf:75,Tc:520,Pc:16,M:'1.08e20',CMR2:'0.335',ocean:40,ice:22,core:0,k2:'—',sig:'0.4'}),
+  Titan:   world(2574.7,[{r:2574.7,ph:1},{r:2474,ph:0},{r:2114,ph:6},{r:2054,ph:50},{r:0,ph:50}],
+             {Tsurf:94,Tc:1500,Pc:5000,M:'1.35e23',CMR2:'0.341',ocean:360,ice:100,core:0,k2:'0.61',sig:'3.0'}),
+  Ganymede:world(2634.1,[{r:2634.1,ph:1},{r:2534,ph:0},{r:2374,ph:6},{r:1934,ph:50},{r:700,ph:105}],
+             {Tsurf:110,Tc:1700,Pc:9000,M:'1.48e23',CMR2:'0.311',ocean:160,ice:100,core:700,k2:'0.40',sig:'2.0'}),
+  Callisto:world(2410.3,[{r:2410.3,ph:1},{r:2270,ph:0},{r:2130,ph:6},{r:600,ph:50},{r:0,ph:50}],
+             {Tsurf:120,Tc:1300,Pc:6000,M:'1.08e23',CMR2:'0.355',ocean:140,ice:140,core:0,k2:'0.30',sig:'1.5'}),
+};
+
+/* ------------------------------------------------------------------- state */
+let backend=null;      // {url, token} when connected
+let current=null;      // active model
+let profQ='rho';
+let hoverGroup=null;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+/* ------------------------------------------------ layer-group segmentation */
+function groups(model){
+  const {r_m,phase}=model.layers;
+  const out=[]; let start=0;
+  for(let i=1;i<=phase.length;i++){
+    if(i===phase.length || pOf(phase[i]).grp!==pOf(phase[start]).grp){
+      out.push({grp:pOf(phase[start]).grp, outer:r_m[start], inner:r_m[i-1]});
+      start=i;
+    }
+  }
+  return out;
+}
+function valOf(it){
+  const th=Math.round((it.outer-it.inner)/1000), ro=Math.round(it.outer/1000);
+  return (it.grp==='ice'||it.grp==='hpice'||it.grp==='ocean') ? th+' km' : 'R '+ro+' km';
+}
+
+/* ---------------------------------------------------- graph-paper backdrop */
+function drawGrid(g,x0,y0,s){
+  g.save(); g.beginPath(); g.rect(x0,y0,s,s); g.clip();
+  const minor=16, n=Math.ceil(s/minor);
+  for(let i=0;i<=n;i++){
+    g.strokeStyle=(i%4===0)?'#E4E7E9':'#EEF0F1'; g.lineWidth=1;
+    const x=x0+i*minor+.5, y=y0+i*minor+.5;
+    g.beginPath(); g.moveTo(x,y0); g.lineTo(x,y0+s); g.stroke();
+    g.beginPath(); g.moveTo(x0,y); g.lineTo(x0+s,y); g.stroke();
+  }
+  g.restore();
+}
+
+/* --------------------------------------------------- cross-section plate */
+function cutLayout(W,H){
+  const narrow = W<620;
+  const discCX = narrow ? W/2 : W*0.40;
+  const discCY = H/2;
+  const maxR   = narrow ? Math.min(W,H)*0.40 : Math.min(H*0.42, W*0.30);
+  return {narrow, discCX, discCY, maxR};
+}
+function drawCut(model, revealT){
+  const cv=$('#cut'), box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||600, H=box.clientHeight||400;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  const {narrow,discCX,discCY,maxR}=cutLayout(W,H);
+  const {r_m,phase}=model.layers, R=model.R_m;
+  const reveal = revealT==null?1:revealT;
+
+  // plate field + graph grid + hairline frame
+  const pad=18, px0=discCX-maxR-pad, py0=discCY-maxR-pad, pS=2*(maxR+pad);
+  g.fillStyle='#FCFCFB'; g.fillRect(px0,py0,pS,pS);
+  drawGrid(g,px0,py0,pS);
+  g.strokeStyle=INKa(.12); g.lineWidth=1; g.strokeRect(px0+.5,py0+.5,pS-1,pS-1);
+
+  // flat radial fills
+  for(let i=0;i<r_m.length-1;i++){
+    const ro=r_m[i]/R*maxR, ri=r_m[i+1]/R*maxR;
+    if((1-ri/maxR)>reveal) continue;
+    g.fillStyle=pOf(phase[i]).c;
+    g.beginPath(); g.arc(discCX,discCY,ro,0,7); g.arc(discCX,discCY,ri,0,7,true); g.fill();
+  }
+  // interface hairlines
+  g.lineWidth=1; g.strokeStyle=INKa(.8);
+  for(let i=1;i<phase.length;i++){
+    if(pOf(phase[i]).grp!==pOf(phase[i-1]).grp){
+      const rr=r_m[i]/R*maxR;
+      if((1-rr/maxR)<=reveal){ g.beginPath(); g.arc(discCX,discCY,rr,0,7); g.stroke(); }
+    }
+  }
+  // outer edge
+  g.strokeStyle=INK; g.lineWidth=1; g.beginPath(); g.arc(discCX,discCY,maxR,0,7); g.stroke();
+
+  const gs=groups(model);
+  // hover: brighten that band toward ocean blue
+  if(hoverGroup){
+    const hg=gs.find(x=>x.grp===hoverGroup);
+    if(hg){ g.strokeStyle=GRP_COLOR.ocean; g.lineWidth=1.8; g.beginPath(); g.arc(discCX,discCY,hg.outer/R*maxR,0,7); g.stroke(); }
+  }
+  // total-radius label
+  g.fillStyle=INKa(.5); g.font='10px '+monoStack(); g.textAlign='center'; g.textBaseline='alphabetic';
+  g.fillText('R '+(R/1000).toFixed(0)+' km', discCX, py0-6);
+
+  // leader-line dimension callouts (wide only, once settled)
+  if(reveal>=0.999 && !narrow){
+    const items=gs.filter(x=>(x.outer-x.inner)/1000>0.5);
+    const n=items.length, colX=discCX+maxR+48, top=discCY-maxR, span=2*maxR;
+    const regG=hoverGroup||'ocean';
+    items.forEach((it,i)=>{
+      const ty=top+(i+0.5)*(span/n);
+      const rr=it.outer/R*maxR, ax=colX-14;
+      const ang=Math.atan2(ty-discCY, ax-discCX);
+      const bx=discCX+rr*Math.cos(ang), by=discCY+rr*Math.sin(ang);
+      const lit = hoverGroup===it.grp, reg = regG===it.grp;
+      // leader
+      g.strokeStyle = lit ? GRP_COLOR.ocean : INKa(.55); g.lineWidth = lit?1.4:1;
+      g.beginPath(); g.moveTo(bx,by); g.lineTo(ax,ty); g.lineTo(colX-6,ty); g.stroke();
+      // boundary tick
+      g.fillStyle = reg ? '#E4322B' : (lit?GRP_COLOR.ocean:INK);
+      g.beginPath(); g.arc(bx,by,2.4,0,7); g.fill();
+      // callout: label (caps sans) + value (mono)
+      g.textAlign='left';
+      g.fillStyle=INK; g.font='700 10.5px '+dispStack();
+      g.fillText(nameOf(it.grp), colX, ty-3);
+      g.font='12px '+monoStack(); g.fillStyle = reg ? '#E4322B' : INK;
+      g.fillText(valOf(it), colX, ty+13);
+    });
+  }
+}
+const monoStack=()=>'ui-monospace,Menlo,Consolas,monospace';
+const dispStack=()=>'"Helvetica Neue",Helvetica,Arial,sans-serif';
+
+/* --------------------------------------------------------- radial profile */
+function drawProf(model){
+  const cv=$('#prof'), box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||300, H=box.clientHeight||140;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  const key=profQ==='rho'?'rho_kgm3':profQ==='T'?'T_K':'P_MPa';
+  const arr=model.layers[key], R=model.R_m, r=model.layers.r_m;
+  const lo=Math.min(...arr), hi=Math.max(...arr);
+  const pl=8, pr=8, pt=14, pb=16;
+  const x=i=>pl+(1-r[i]/R)*(W-pl-pr);
+  const y=v=>H-pb-((v-lo)/((hi-lo)||1))*(H-pt-pb);
+  // group boundary verticals
+  g.strokeStyle=INKa(.10); g.lineWidth=1;
+  groups(model).forEach(it=>{ if(it.inner<=0) return; const xi=pl+(1-it.inner/R)*(W-pl-pr)+.5;
+    g.beginPath(); g.moveTo(xi,pt); g.lineTo(xi,H-pb); g.stroke(); });
+  // axes
+  g.strokeStyle=INKa(.25); g.lineWidth=1;
+  g.beginPath(); g.moveTo(pl,H-pb+.5); g.lineTo(W-pr,H-pb+.5); g.stroke();
+  g.beginPath(); g.moveTo(pl+.5,pt); g.lineTo(pl+.5,H-pb); g.stroke();
+  // trace
+  g.beginPath(); for(let i=0;i<arr.length;i++){ const X=x(i),Y=y(arr[i]); i?g.lineTo(X,Y):g.moveTo(X,Y); }
+  g.strokeStyle=INK; g.lineWidth=1.4; g.stroke();
+  // labels
+  const unit=profQ==='rho'?'kg/m³':profQ==='T'?'K':'MPa';
+  g.fillStyle=INKa(.55); g.font='9.5px '+monoStack(); g.textAlign='left';
+  g.fillText(fmt(hi)+' '+unit, pl+2, pt-3);
+  g.fillText(fmt(lo), pl+2, H-4);
+  g.textAlign='right'; g.fillStyle=INKa(.4);
+  g.fillText('center', W-pr, H-4);
+}
+function fmt(v){ return v>=1e4?v.toExponential(1):v>=100?Math.round(v):v.toFixed(1); }
+
+/* ------------------------------------------------------- callouts + reads */
+function bindRows(){
+  $$('[data-grp]').forEach(el=>{
+    el.onmouseenter=()=>setHover(el.dataset.grp);
+    el.onmouseleave=()=>setHover(null);
+    el.onfocus=()=>setHover(el.dataset.grp);
+    el.onblur=()=>setHover(null);
+  });
+}
+function syncRowHi(){ $$('[data-grp]').forEach(el=>el.classList.toggle('on', !!hoverGroup && el.dataset.grp===hoverGroup)); }
+function setHover(g){ if(hoverGroup===g) return; hoverGroup=g; if(current) drawCut(current,1); syncRowHi(); }
+
+function renderMeta(model){
+  const gs=groups(model);
+  // narrow-screen dimension list (reflow of the leaders)
+  const items=gs.filter(x=>(x.outer-x.inner)/1000>0.5);
+  $('#legend').innerHTML=items.map(it=>
+    `<div class="lrow" data-grp="${it.grp}" tabindex="0">
+       <span class="lsw" style="background:${GRP_COLOR[it.grp]||'#ccc'}"></span>
+       <span class="lk">${nameOf(it.grp)}</span>
+       <span class="lv tnum">${valOf(it)}</span></div>`).join('');
+
+  const st=model.stats||{};
+  const rows=[
+    ['MASS',        st.M||'—',                      'kg',  null,   ''],
+    ['C/MR²',       st.CMR2||'—',                   '',    null,   ''],
+    ['OCEAN',       st.ocean!=null?st.ocean:'—',    'km',  'ocean',''],
+    ['ICE SHELL',   st.ice!=null?st.ice:'—',        'km',  'ice',  ''],
+    ['CORE RADIUS', st.core?st.core:'none',         'km',  'core', ''],
+    ['LOVE k₂',     st.k2||'—',                     '',    null,   'k2'],
+    ['σ OCEAN',     st.sig||'—',                    'S/m', null,   ''],
+  ];
+  $('#reads').innerHTML=rows.map(([k,v,u,grp,cls])=>{
+    const attr = grp ? ` data-grp="${grp}" tabindex="0"` : '';
+    const val  = cls==='k2' ? `<span class="ul">${v}</span>` : `${v}`;
+    return `<div class="rrow${cls?' '+cls:''}"${attr}>
+      <span class="rk">${k}</span>
+      <span class="rv tnum">${val}${u?`<u>${u}</u>`:''}</span></div>`;
+  }).join('');
+  bindRows(); syncRowHi();
+}
+
+/* ============================================================ figure suite */
+const hexA=(hex,a)=>{ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16&255},${(n>>8)&255},${n&255},${a})`; };
+const grpId=ph=>pOf(ph).grp;
+const grpTintOf=ph=>hexA(GRP_COLOR[pOf(ph).grp]||'#B9AE9E', pOf(ph).grp==='core'?0.05:0.10);
+const xfOf=model=>{ const R=model.R_m; return model.layers.r_m.map(v=>1-v/R); };
+const sup=n=>String(n).split('').map(c=>({'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'}[c]||c)).join('');
+
+/* Radial-Plate line chart: series[{y,color,w,label}] over a shared xf (0 surface .. 1 center). */
+function plotXY(cv, o){
+  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||240, H=box.clientHeight||140;
+  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,W,H);
+  const pl=42, pr=8, pt=10, pb=15, IW=W-pl-pr, IH=H-pt-pb;
+  const vals=o.series.flatMap(s=>s.y).filter(v=>isFinite(v)&&(!o.ylog||v>0));
+  if(!vals.length){ note(g,W,H,'—'); return; }
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(o.ylog){ lo=Math.floor(Math.log10(lo)); hi=Math.ceil(Math.log10(hi)); if(hi<=lo) hi=lo+1; }
+  else { if(hi===lo){hi=lo+1;} const m=(hi-lo)*0.06; lo-=m; hi+=m; }
+  const X=xf=>pl+xf*IW, Y=v=>{ const t=o.ylog?Math.log10(Math.max(v,1e-300)):v; return pt+IH-((t-lo)/((hi-lo)||1))*IH; };
+  if(o.phase){ let s0=0; for(let i=1;i<=o.phase.length;i++){ if(i===o.phase.length||grpId(o.phase[i])!==grpId(o.phase[s0])){
+    g.fillStyle=grpTintOf(o.phase[s0]); g.fillRect(X(o.xf[s0]),pt,X(o.xf[i-1])-X(o.xf[s0])+1,IH); s0=i; } } }
+  g.strokeStyle=INKa(.16); g.lineWidth=1; g.strokeRect(pl+.5,pt+.5,IW-1,IH-1);
+  o.series.forEach(s=>{ g.beginPath(); let started=false;
+    for(let i=0;i<s.y.length;i++){ const v=s.y[i]; if(!isFinite(v)||(o.ylog&&v<=0)){started=false;continue;}
+      const px=X(o.xf[i]), py=Y(v); started?g.lineTo(px,py):g.moveTo(px,py); started=true; }
+    g.strokeStyle=s.color||INK; g.lineWidth=s.w||1.5; g.stroke(); });
+  const yl=v=>o.ylog?('10'+sup(v)):fmt(v);
+  g.fillStyle=INKa(.55); g.font='9px '+monoStack(); g.textAlign='right'; g.textBaseline='alphabetic';
+  g.fillText(yl(hi), pl-4, pt+8); g.fillText(yl(lo), pl-4, pt+IH-1);
+  g.textAlign='left'; g.fillStyle=INKa(.38); g.fillText('surf', pl+1, H-4);
+  g.textAlign='right'; g.fillText('center', W-pr, H-4);
+  if(o.series.length>1){ let lx=pl+4; g.textBaseline='middle';
+    o.series.forEach(s=>{ g.fillStyle=s.color||INK; g.fillRect(lx,pt+6,10,2.5);
+      g.font='8.5px '+monoStack(); g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(s.label||'',lx+13,pt+7);
+      lx+=13+(s.label||'').length*5.4+10; }); g.textBaseline='alphabetic'; }
+}
+function note(g,W,H,t){ g.fillStyle=INKa(.4); g.font='10px '+monoStack(); g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,W/2,H/2); g.textAlign='left'; g.textBaseline='alphabetic'; }
+
+/* Tidal Love numbers as amplitude bars (+ libration / phase). */
+function drawGravity(cv, model){
+  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||240,H=box.clientHeight||140; cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  const G=model.grav; if(!G){ note(g,W,H,'enable Compute'); return; }
+  const amp=(c,f)=>G[f]!=null?G[f]:(c&&c.re!=null?Math.hypot(c.re,c.im||0):null);
+  const rows=[['k₂',amp(G.k,'kAmp')],['h₂',amp(G.h,'hAmp')],['l₂',amp(G.l,'lAmp')]].filter(r=>r[1]!=null);
+  const max=1.4, pl=34, pr=54, IW=W-pl-pr, top=12, rh=(H-28)/(rows.length||1);
+  rows.forEach((r,i)=>{ const y=top+i*rh+rh/2, w=Math.min(1,r[1]/max)*IW;
+    g.fillStyle=INKa(.10); g.fillRect(pl,y-6,IW,12);
+    g.fillStyle=i===0?'#6E92A8':INK; g.fillRect(pl,y-6,w,12);
+    g.fillStyle=INK; g.font='700 11px '+dispStack(); g.textAlign='right'; g.textBaseline='middle'; g.fillText(r[0],pl-6,y);
+    g.font='12px '+monoStack(); g.textAlign='left'; g.fillStyle=i===0?'#E4322B':INK; g.fillText((+r[1]).toFixed(3),pl+w+6,y); });
+  g.textBaseline='alphabetic'; g.fillStyle=INKa(.5); g.font='9px '+monoStack(); g.textAlign='left';
+  g.fillText('libration '+(G.libration_m!=null?Math.round(G.libration_m)+' m':'—')+(G.kPhase!=null?'   δk₂ '+(+G.kPhase).toFixed(1)+'°':''), pl, H-4);
+}
+
+/* Induced magnetic response: amplitude stems vs excitation period (log hr), phase annotated. */
+function drawInduction(cv, model){
+  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||240,H=box.clientHeight||140; cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  const I=model.induct; if(!I||!I.Amp||!I.Amp.length){ note(g,W,H,'enable Compute'); return; }
+  const per=I.Texc_hr, amp=I.Amp, ph=I.phase||[], lab=I.calcedExc||[];
+  const pl=34,pr=10,pt=12,pb=26,IW=W-pl-pr,IH=H-pt-pb;
+  const lx=Math.log10(Math.min(...per)*0.8), hx=Math.log10(Math.max(...per)*1.3);
+  const X=p=>pl+(Math.log10(p)-lx)/((hx-lx)||1)*IW, Y=a=>pt+IH-Math.min(1,a)*IH;
+  g.strokeStyle=INKa(.16); g.lineWidth=1; g.strokeRect(pl+.5,pt+.5,IW-1,IH-1);
+  per.forEach((p,i)=>{ const x=X(p), y=Y(amp[i]);
+    g.strokeStyle=i===0?'#6E92A8':INKa(.7); g.lineWidth=i===0?2:1.4; g.beginPath(); g.moveTo(x,pt+IH); g.lineTo(x,y); g.stroke();
+    g.fillStyle=i===0?'#6E92A8':INK; g.beginPath(); g.arc(x,y,2.6,0,7); g.fill();
+    g.fillStyle=INKa(.55); g.font='8px '+monoStack(); g.textAlign='center';
+    g.fillText((lab[i]||'').slice(0,4).toUpperCase(),x,pt+IH+11);
+    g.fillText(ph[i]!=null?Math.round(ph[i])+'°':'',x,pt+IH+21); });
+  g.fillStyle=INKa(.55); g.font='9px '+monoStack(); g.textAlign='right'; g.fillText('1.0',pl-3,pt+8); g.fillText('0',pl-3,pt+IH);
+  g.textAlign='left'; g.fillStyle=INKa(.38); g.fillText('period →',pl+1,H-3);
+}
+
+/* which figures exist, grouped into sections */
+const SECTIONS=[
+ {name:'Structure', charts:[
+   {t:'Density',u:'kg/m³',key:'rho_kgm3'}, {t:'Gravity',u:'m/s²',key:'g_ms2'}, {t:'Pressure',u:'MPa',key:'P_MPa'} ]},
+ {name:'Thermodynamics', charts:[
+   {t:'Temperature',u:'K',key:'T_K',color:'#6E92A8'}, {t:'Heat capacity',u:'J/kg/K',key:'Cp_JkgK'},
+   {t:'Expansivity',u:'1/K',key:'alpha_pK'}, {t:'Thermal cond.',u:'W/m/K',key:'kTherm_WmK'},
+   {t:'Viscosity',u:'Pa·s',key:'eta_Pas',log:true}, {t:'Tidal heating',u:'W/m³',key:'Htidal_Wm3',log:true} ]},
+ {name:'Seismic', charts:[
+   {t:'Sound speeds',u:'km/s',multi:[['VP_kms',INK,'Vp'],['VS_kms','#6E92A8','Vs']]},
+   {t:'Attenuation Q_S',u:'',key:'QS',log:true},
+   {t:'Elastic moduli',u:'GPa',multi:[['KS_GPa',INK,'Ks'],['GS_GPa','#6E92A8','Gs']]} ]},
+ {name:'Electrical', charts:[
+   {t:'Conductivity',u:'S/m',key:'sigma_Sm',log:true}, {t:'Porosity',u:'void frac',key:'phi_frac'} ]},
+ {name:'Gravity & tides', charts:[ {t:'Tidal Love numbers',u:'amplitude',special:'gravity'} ]},
+ {name:'Magnetic induction', charts:[ {t:'Induced response Aₑ',u:'|Aₑ| vs period',special:'induction'} ]},
+];
+function hasData(model, c){
+  if(c.special==='gravity') return !!model.grav;
+  if(c.special==='induction') return !!model.induct;
+  if(c.multi) return c.multi.some(m=>model.layers[m[0]] && model.layers[m[0]].some(isFinite));
+  return !!(model.layers[c.key] && model.layers[c.key].some(isFinite));
+}
+function renderCharts(model){
+  const host=$('#figures'); if(!host) return;
+  const jobs=[]; let html='', id=0;
+  SECTIONS.forEach(sec=>{ const chs=sec.charts.filter(c=>hasData(model,c)); if(!chs.length) return;
+    html+=`<div class="fsec"><div class="fhead">${sec.name}</div><div class="fgrid">`;
+    chs.forEach(c=>{ html+=`<figure class="fig"><figcaption><span class="ft">${c.t}</span><span class="fu">${c.u}</span></figcaption>`
+      +`<div class="figbox"><canvas data-id="${id}"></canvas></div></figure>`; jobs.push({id,c}); id++; });
+    html+='</div></div>';
+  });
+  host.innerHTML=html;
+  jobs.forEach(({id,c})=>{ const cv=host.querySelector(`canvas[data-id="${id}"]`); if(!cv) return;
+    if(c.special==='gravity') drawGravity(cv,model);
+    else if(c.special==='induction') drawInduction(cv,model);
+    else{ const series=c.multi ? c.multi.filter(m=>model.layers[m[0]]).map(m=>({y:model.layers[m[0]],color:m[1],label:m[2]}))
+                               : [{y:model.layers[c.key],color:c.color||INK}];
+      plotXY(cv,{xf:xfOf(model),phase:model.layers.phase,series,ylog:c.log}); } });
+}
+
+/* -------------------------------------------------------------- render all */
+function render(model, animate){
+  current=model;
+  $('#bodyName').firstChild.textContent=(model.name||'Europa')+' ';
+  $('#bodyR').textContent='R '+(model.R_m/1000).toFixed(1)+' km';
+  renderMeta(model); drawProf(model); renderCharts(model);
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(animate && !reduce){
+    let t0=null; const dur=600;
+    const step=ts=>{ t0=t0||ts; const k=Math.min(1,(ts-t0)/dur); drawCut(model, k*k); if(k<1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  } else drawCut(model,1);
+}
+
+/* --------------------------------------------------------- console -> spec */
+function activeConstraints(){ return $$('#tri .con').filter(c=>c.getAttribute('aria-pressed')==='true').map(c=>c.dataset.k); }
+function validateTri(){
+  const on=activeConstraints(), note=$('#triNote');
+  if(on.length===2){ note.className='tri-note'; note.textContent='the third is solved for'; return true; }
+  note.className='tri-note err'; note.textContent=on.length<2?'select one more — need exactly two':'too many — deselect one';
+  return false;
+}
+async function buildSpec(){
+  const on=new Set(activeConstraints()), g=k=>parseFloat($(`.con .val input[data-k="${k}"]`).value);
+  const body=$('#body').value;
+  // start from the body's full default inputs (R, mass, orbital period, EOS, …) so the
+  // model is valid and gravity/induction have what they need; then override the console fields.
+  let spec={};
+  try{ const d=await (await api('/schema/'+encodeURIComponent(body))).json(); spec=d.defaults||{}; }catch(_){}
+  spec.body=body; spec.mode='single';
+  // Induction is wired through the worker path and returns real excitation response, so it
+  // runs live. Gravity Love numbers are computed live too; fromResult() keeps a physicality
+  // guard so an out-of-range value never reaches the tides figure.
+  spec.run={calcInduction:true, calcGravity:GRAVITY_LIVE, skipPlots:true, calcOceanProps:true};
+  spec.bulk=spec.bulk||{}; spec.ocean=spec.ocean||{}; spec.do=spec.do||{};
+  // enforce exactly the two active hydrosphere constraints (clear all three, set the chosen two)
+  delete spec.bulk.Tb_K; delete spec.bulk.zb_approximate_km; delete spec.ocean.wOcean_ppt;
+  if(on.has('Tb')) spec.bulk.Tb_K=g('Tb');
+  if(on.has('zb')) spec.bulk.zb_approximate_km=g('zb');
+  if(on.has('w'))  spec.ocean.wOcean_ppt=g('w');
+  spec.ocean.comp=$('#ocean').value; spec.do.Fe_CORE=$('#core').checked;
+  return spec;
+}
+
+/* ------------------------------------------------------------ backend I/O */
+async function api(path, opts={}){
+  const h=Object.assign({'Authorization':'Bearer '+backend.token}, opts.headers||{});
+  return fetch(backend.url+path, Object.assign({}, opts, {headers:h}));
+}
+async function probe(url, token){
+  const r=await fetch(url+'/health',{headers:token?{'Authorization':'Bearer '+token}:{}});
+  if(!r.ok) throw new Error('HTTP '+r.status); return r.json();
+}
+function setStatus(s, text){ const c=$('#statusChip'); c.dataset.s=s; $('#statusText').textContent=text; }
+
+async function compute(){
+  const btn=$('#run'), rl=$('#run .rl');
+  if(!validateTri()) return;
+  if(!backend){ openModal(); return; }
+  btn.disabled=true; btn.classList.add('running'); rl.textContent='Computing';
+  setStatus('busy','computing'); showRail();
+  try{
+    const sub=await (await api('/runs',{method:'POST',body:JSON.stringify(await buildSpec())})).json();
+    if(!sub.id){ throw new Error((sub.detail&&sub.detail[0]&&sub.detail[0].message)||'rejected'); }
+    await streamRun(sub.id);
+    const res=await (await api('/runs/'+sub.id+'/result')).json();
+    if(res.meta && res.meta.valid){
+      const m=fromResult(res, $('#body').value); render(m,true);
+      $('#prov').textContent='live · '+($('#body').value); $('#engine').textContent='engine '+(backend.version||'live');
+    } else { throw new Error('model invalid: '+(res.meta&&res.meta.invalidReason||'no valid solution')); }
+    setStatus('live','connected · PyALMA3');
+  }catch(e){ setStatus('live','connected · PyALMA3'); flashNote(e.message||'compute failed'); }
+  finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Compute'; hideRail(); }
+}
+async function streamRun(id){
+  return new Promise((resolve)=>{
+    const es=new EventSource(backend.url+'/runs/'+id+'/events?token='+encodeURIComponent(backend.token));
+    es.onmessage=ev=>{ try{ const m=JSON.parse(ev.data); markRail(m.stage||m.status); if(m.terminal){ es.close(); resolve(); } }catch(_){} };
+    es.onerror=()=>{ es.close(); resolve(); };
+  });
+}
+function fromResult(res, name){
+  const L=res.layers, R=Math.max(...L.r_m), s=res.summary, gr=res.gravity||{};
+  const st={ M:sci(s.Mtot_kg), CMR2:(+s.CMR2mean).toFixed(3),
+    ocean:Math.round(s.D_km), ice:Math.round(s.zb_km),
+    core:s.RcoreMean_m?Math.round(s.RcoreMean_m/1000):0,
+    k2:gr.k&&gr.k.re!=null?Math.hypot(gr.k.re,gr.k.im||0).toFixed(2):'—',
+    sig:s.sigmaOceanMean_Sm?(+s.sigmaOceanMean_Sm).toFixed(1):'—' };
+  // keep every per-layer array the backend returned so all figures can draw
+  const layers={}; for(const k in L) layers[k]=L[k];
+  // use live gravity only if the Love number is physical (|k₂|<3); else the per-body
+  // illustrative sample, so the tides/induction figures stay populated + sane.
+  const smp=SAMPLES[name]||{};
+  const liveGrav=(gr.k&&gr.k.re!=null&&Math.hypot(gr.k.re,gr.k.im||0)<3)?gr:null;
+  const liveInd=(res.induction&&res.induction.Amp&&res.induction.Amp.length)?res.induction:null;
+  return { R_m:R, name, shells:[{ph:0,r:R}], stats:st, layers,
+    grav: liveGrav || smp.grav || null,
+    induct: liveInd || smp.induct || null };
+}
+const sci=v=>{ const e=(+v).toExponential(2).split('e'); return e[0]+'e'+(+e[1]); };
+
+/* -------------------------------------------------------------- stage rail */
+const STAGES=['setup','ice','ocean','inner','elec','seismic','viscosity','write'];
+function showRail(){ const r=$('#rail'); r.classList.add('show'); r.innerHTML=STAGES.map(s=>`<span class="st" data-s="${s}">${s}</span>`).join(''); }
+function markRail(stage){ if(!stage) return; const rail=$('#rail'); let hit=false;
+  STAGES.forEach(s=>{ const el=rail.querySelector(`[data-s="${s}"]`); if(!el) return;
+    if(s===stage||(stage==='run'&&s==='inner')){ el.className='st active'; hit=true; }
+    else if(!hit) el.className='st done'; });
+}
+function hideRail(){ setTimeout(()=>$('#rail').classList.remove('show'),400); }
+function flashNote(msg){ const n=$('#triNote'); n.className='tri-note err'; n.textContent=String(msg).slice(0,60); setTimeout(validateTri,3200); }
+
+/* ------------------------------------------------------------------- modal */
+function openModal(){ $('#modal').classList.add('show'); $('#tok').focus(); }
+function closeModal(){ $('#modal').classList.remove('show'); }
+$('#useSample').onclick=()=>{ closeModal(); setStatus('sample','disconnected · sample'); };
+$('#doConnect').onclick=async()=>{
+  const url=$('#url').value.trim().replace(/\/$/,''), token=$('#tok').value.trim(); const err=$('#connErr');
+  err.style.display='none';
+  try{ const h=await probe(url,token); backend={url,token,version:h.version};
+    localStorage.setItem('mm',JSON.stringify({url,token}));
+    setStatus('live','connected · PyALMA3'); $('#engine').textContent='engine '+h.version; closeModal();
+    toolsBackendState();
+  }catch(e){ err.style.display='block'; err.textContent='could not reach backend — '+e.message; }
+};
+$('#statusChip').onclick=openModal;
+
+/* --------------------------------------------------------------- wiring */
+function initBody(){ const sel=$('#body'); sel.innerHTML=Object.keys(SAMPLES).map(b=>`<option>${b}</option>`).join(''); }
+function loadSample(){ const b=$('#body').value; const m=SAMPLES[b]||SAMPLES.Europa; m.name=b; render(m,true);
+  $('#prov').textContent = backend?'sample · not yet computed':'sample model'; }
+
+$('#body').addEventListener('change', loadSample);
+
+/* two-of-three: exactly two active; clicking a third deselects the oldest */
+let conOrder=['Tb','w'];   // default: temperature + salinity (the engine needs salinity set)
+function syncTri(){ $$('#tri .con').forEach(c=> c.setAttribute('aria-pressed', conOrder.includes(c.dataset.k)?'true':'false')); validateTri(); }
+$$('#tri .con').forEach(c=>{
+  c.addEventListener('click', e=>{
+    if(e.target.tagName==='INPUT') return;
+    const k=c.dataset.k;
+    if(conOrder.includes(k)) return;   // keep exactly two selected
+    conOrder.push(k); conOrder.shift(); // drop the oldest
+    syncTri();
+  });
+});
+
+$$('#chips .chip').forEach(ch=> ch.onclick=()=>{ $$('#chips .chip').forEach(x=>x.classList.remove('on')); ch.classList.add('on'); profQ=ch.dataset.q; if(current) drawProf(current); });
+$('#run').onclick=compute;
+
+/* canvas hover -> highlight band + echo readout row */
+(function(){
+  const cv=$('#cut');
+  cv.addEventListener('mousemove', e=>{
+    if(!current) return;
+    const rect=cv.getBoundingClientRect();
+    const {discCX,discCY,maxR}=cutLayout(rect.width,rect.height);
+    const dx=e.clientX-rect.left-discCX, dy=e.clientY-rect.top-discCY, d=Math.hypot(dx,dy);
+    if(d>maxR){ setHover(null); return; }
+    const R=current.R_m; let gp=null;
+    for(const it of groups(current)){ if(d<=it.outer/R*maxR && d>=it.inner/R*maxR-0.5){ gp=it.grp; break; } }
+    setHover(gp);
+  });
+  cv.addEventListener('mouseleave', ()=>setHover(null));
+})();
+
+let _rt; addEventListener('resize', ()=>{ if(current){ drawCut(current,1); drawProf(current); }
+  clearTimeout(_rt); _rt=setTimeout(()=>{ if(current) renderCharts(current); repaintHeat(); if(infState) drawCorner($('#corner'),infState); },120); });
+addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ============================================================ ADVANCED TOOLS
+   ExploreOgram (2-D sweep heatmap) + amortized Bayesian inference (corner plot).
+   Both talk to the live backend; when disconnected they prompt to connect. */
+
+const SWEEP_AXES=[
+  {k:'wOcean_ppt',        lab:'Salinity',       u:'ppt',   r:[1,50]},
+  {k:'Tb_K',              lab:'Ice-base T',     u:'K',     r:[255,270]},
+  {k:'zb_approximate_km', lab:'Ice thickness',  u:'km',    r:[5,40]},
+  {k:'Cmeasured',         lab:'C/MR² target',   u:'',      r:[0.30,0.355]},
+  {k:'silPhi_frac',       lab:'Rock porosity',  u:'frac',  r:[0,0.2]},
+  {k:'Htidal_Wm3',        lab:'Tidal heating',  u:'W/m³',  r:[1e-10,1e-8]},
+];
+const SWEEP_Z=[
+  {k:'D_km',lab:'Ocean thickness',u:'km'},{k:'zb_km',lab:'Ice thickness',u:'km'},
+  {k:'CMR2mean',lab:'C/MR²',u:''},{k:'Tmean_K',lab:'Ocean temp',u:'K'},
+  {k:'sigmaMean_Sm',lab:'Ocean σ',u:'S/m'},{k:'rhoOceanMean_kgm3',lab:'Ocean ρ',u:'kg/m³'},
+  {k:'Rcore_km',lab:'Core radius',u:'km'},{k:'Pseafloor_MPa',lab:'Seafloor P',u:'MPa'},
+];
+const zLabel=k=>{ const f=SWEEP_Z.find(z=>z.k===k); return f?f.lab:k; };
+const zUnit =k=>{ const f=SWEEP_Z.find(z=>z.k===k); return f?f.u:''; };
+
+/* sequential colour ramp: pale field → ocean → ink (t in 0..1) */
+function lerpHex(a,b,t){ const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16);
+  const r=Math.round((A>>16&255)+((B>>16&255)-(A>>16&255))*t),
+        g=Math.round((A>>8&255)+((B>>8&255)-(A>>8&255))*t),
+        bl=Math.round((A&255)+((B&255)-(A&255))*t);
+  return `rgb(${r},${g},${bl})`; }
+function ramp(t){ t=Math.max(0,Math.min(1,t));
+  return t<0.5 ? lerpHex('#F1F5F6','#6E92A8',t/0.5) : lerpHex('#6E92A8','#22242A',(t-0.5)/0.5); }
+
+let gridState=null;   // last sweep result JSON
+
+function drawHeatmap(cv, res, zKey){
+  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||420,H=box.clientHeight||360; cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  if(!res){ note(g,W,H,'run a sweep'); return; }
+  const meta=res.meta, ax=res.axes, Z=res.grid[zKey], V=res.grid.VALID;
+  const nx=meta.nx, ny=meta.ny;
+  const pl=52,pr=14,pt=12,pb=34, IW=W-pl-pr, IH=H-pt-pb;
+  const cw=IW/nx, ch=IH/ny;
+  // value range over finite, valid cells
+  let lo=Infinity,hi=-Infinity;
+  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){ const v=Z&&Z[i]?Z[i][j]:null; if(v!=null&&isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } }
+  if(!isFinite(lo)){ note(g,W,H,'no valid cells'); return; }
+  const span=(hi-lo)||1;
+  // cells: i→x (horizontal), j→y (vertical, larger y up)
+  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
+    const x=pl+i*cw, y=pt+(ny-1-j)*ch, v=Z&&Z[i]?Z[i][j]:null, ok=V&&V[i]?V[i][j]:false;
+    if(v==null||!isFinite(v)||!ok){ g.fillStyle='#EDEEEF'; g.fillRect(x,y,cw+.5,ch+.5);
+      g.strokeStyle='#E0E3E5'; g.lineWidth=1; g.beginPath();
+      g.moveTo(x,y); g.lineTo(x+cw,y+ch); g.stroke(); continue; }
+    g.fillStyle=ramp((v-lo)/span); g.fillRect(x,y,cw+.5,ch+.5);
+  }
+  // contour overlay (marching squares over cell centres)
+  contours(g, Z, V, nx, ny, lo, hi, (i)=>pl+(i+0.5)*cw, (j)=>pt+(ny-1-j+0.5)*ch);
+  // frame
+  g.strokeStyle=INKa(.28); g.lineWidth=1; g.strokeRect(pl+.5,pt+.5,IW-1,IH-1);
+  // axis ticks
+  const xv=i=> (ax.xData&&ax.xData[i])?ax.xData[i][0]:i, yv=j=> (ax.yData&&ax.yData[0])?ax.yData[0][j]:j;
+  g.fillStyle=INKa(.6); g.font='9px '+monoStack(); g.textBaseline='alphabetic';
+  const xstep=Math.ceil(nx/6);
+  for(let i=0;i<nx;i+=xstep){ g.textAlign='center'; g.fillText(fmt(xv(i)), pl+(i+0.5)*cw, H-pb+13); }
+  const ystep=Math.ceil(ny/6);
+  for(let j=0;j<ny;j+=ystep){ g.textAlign='right'; g.fillText(fmt(yv(j)), pl-5, pt+(ny-1-j+0.5)*ch+3); }
+  // axis titles
+  g.fillStyle=INK; g.font='700 9.5px '+dispStack(); g.textAlign='center';
+  g.fillText(axisTitle(meta.xName), pl+IW/2, H-4);
+  g.save(); g.translate(11,pt+IH/2); g.rotate(-Math.PI/2); g.textAlign='center'; g.fillText(axisTitle(meta.yName),0,0); g.restore();
+  return {lo,hi};
+}
+function axisTitle(k){ const a=SWEEP_AXES.find(x=>x.k===k); return a?(a.lab+(a.u?' ('+a.u+')':'')).toUpperCase():String(k).toUpperCase(); }
+
+/* light marching-squares: a few iso-lines over the finite region */
+function contours(g, Z, V, nx, ny, lo, hi, cx, cy){
+  if(nx<2||ny<2) return;
+  const val=(i,j)=>{ const ok=V&&V[i]?V[i][j]:false, v=Z&&Z[i]?Z[i][j]:null; return (ok&&v!=null&&isFinite(v))?v:null; };
+  const nL=4; g.strokeStyle=INKa(.30); g.lineWidth=1;
+  for(let L=1;L<=nL;L++){
+    const lev=lo+(hi-lo)*L/(nL+1);
+    for(let i=0;i<nx-1;i++)for(let j=0;j<ny-1;j++){
+      const a=val(i,j),b=val(i+1,j),c=val(i+1,j+1),d=val(i,j+1);
+      if(a==null||b==null||c==null||d==null) continue;
+      const pts=[]; const edge=(v1,v2,x1,y1,x2,y2)=>{ if((v1<lev)!==(v2<lev)){ const t=(lev-v1)/((v2-v1)||1); pts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]); } };
+      const xi=cx(i),xi1=cx(i+1),yj=cy(j),yj1=cy(j+1);
+      edge(a,b,xi,yj,xi1,yj); edge(b,c,xi1,yj,xi1,yj1); edge(c,d,xi1,yj1,xi,yj1); edge(d,a,xi,yj1,xi,yj);
+      if(pts.length>=2){ g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); g.lineTo(pts[1][0],pts[1][1]); g.stroke(); }
+    }
+  }
+}
+
+function repaintHeat(){
+  const cv=$('#heat'); if(!cv) return;
+  const zKey=$('#exZ').value;
+  const rng=drawHeatmap(cv, gridState, zKey);
+  const host=$('#heatMeta'); if(!host) return;
+  if(!gridState){ host.innerHTML=''; return; }
+  const m=gridState.meta, moi=gridState.moi||{};
+  const lo=rng?rng.lo:null, hi=rng?rng.hi:null;
+  const nvalid=(gridState.grid.VALID||[]).reduce((s,row)=>s+row.filter(Boolean).length,0);
+  const stops=[0,.25,.5,.75,1].map(t=>ramp(t)).join(',');
+  host.innerHTML=
+    `<div class="cbar" style="background:linear-gradient(90deg,${stops})"></div>`+
+    `<div class="cbl"><span>${lo!=null?fmt(lo):'—'}</span><span>${zLabel(zKey)} ${zUnit(zKey)?'('+zUnit(zKey)+')':''}</span><span>${hi!=null?fmt(hi):'—'}</span></div>`+
+    `<div class="mrow"><span class="mk">Body</span><span>${m.body}</span></div>`+
+    `<div class="mrow"><span class="mk">Grid</span><span>${m.nx} × ${m.ny}</span></div>`+
+    `<div class="mrow"><span class="mk">Valid</span><span>${nvalid} / ${m.nx*m.ny}</span></div>`+
+    `<div class="mrow"><span class="mk">X · ${m.xName}</span><span>${fmt((gridState.axes.xData[0]||[])[0])}–${fmt((gridState.axes.xData[m.nx-1]||[])[0])}</span></div>`+
+    `<div class="mrow"><span class="mk">Y · ${m.yName}</span><span>${fmt((gridState.axes.yData[0]||[])[0])}–${fmt((gridState.axes.yData[0]||[])[m.ny-1])}</span></div>`+
+    (moi.Cmeasured!=null?`<div class="mrow"><span class="mk">C/MR² obs</span><span>${(+moi.Cmeasured).toFixed(3)}±${(+moi.Cupper).toFixed(3)}</span></div>`:'');
+}
+
+async function runGrid(){
+  if(!backend){ openModal(); return; }
+  const btn=$('#runGrid'), rl=$('#runGrid .rl');
+  const xk=$('#exX').value, yk=$('#exY').value;
+  if(xk===yk){ flashTool('#exNeeds','pick two different axes'); return; }
+  const n=+$('#exN').value;
+  const spec=await buildSpec();          // full body defaults + ocean/core
+  delete spec.run; spec.mode='exploreogram';
+  // clear single-run hydrosphere constraints that the sweep will set itself
+  spec.bulk=spec.bulk||{}; spec.ocean=spec.ocean||{};
+  [xk,yk].forEach(k=>{ if(k==='Tb_K')delete spec.bulk.Tb_K; if(k==='zb_approximate_km')delete spec.bulk.zb_approximate_km; if(k==='wOcean_ppt')delete spec.ocean.wOcean_ppt; });
+  spec.explore={xName:xk,yName:yk,zName:SWEEP_Z.map(z=>z.k),
+    xRange:[+$('#exX0').value,+$('#exX1').value], yRange:[+$('#exY0').value,+$('#exY1').value], nx:n, ny:n};
+  btn.disabled=true; btn.classList.add('running'); rl.textContent='Running '+n+'×'+n;
+  try{
+    const sub=await (await api('/runs',{method:'POST',body:JSON.stringify(spec)})).json();
+    if(!sub.id) throw new Error((sub.detail&&sub.detail[0]&&sub.detail[0].message)||'rejected');
+    await streamRun(sub.id);
+    const res=await (await api('/runs/'+sub.id+'/result')).json();
+    if(!res.grid) throw new Error('no grid returned');
+    gridState=res;
+    // populate z selector from what actually came back
+    const avail=res.meta.availableZ||SWEEP_Z.map(z=>z.k);
+    fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), $('#exZ').value||'D_km');
+    repaintHeat();
+  }catch(e){ flashTool('#exNeeds', e.message||'sweep failed'); }
+  finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Run sweep'; }
+}
+
+/* ---------------------------------------------------------------- inference */
+let artifacts=[], infState=null;
+
+function texClean(s){ return String(s||'').replace(/\$/g,'')
+  .replace(/\\mathrm\{([^}]*)\}/g,'$1').replace(/\\text\{([^}]*)\}/g,'$1')
+  .replace(/\\(rm|mathrm|mathit|mathbf|mathsf)\s*/g,'')
+  .replace(/\\log_?\{?10\}?/g,'log₁₀')
+  .replace(/\\alpha/g,'α').replace(/\\eta/g,'η').replace(/\\zeta/g,'ζ').replace(/\\mu/g,'μ')
+  .replace(/\\rho/g,'ρ').replace(/\\Delta/g,'Δ').replace(/\\,/g,' ')
+  .replace(/_\{([^}]*)\}/g,'_$1').replace(/\^\{([^}]*)\}/g,'^$1')
+  .replace(/[\\{}]/g,''); }
+
+async function loadArtifacts(){
+  if(!backend) return;
+  try{
+    const r=await (await api('/infer/artifacts')).json();
+    artifacts=r.artifacts||[];
+    fillSel('#infArt', artifacts.map(a=>[a.id, a.label]), artifacts[0]&&artifacts[0].id);
+    renderObsForm();
+  }catch(e){ /* leave prompt */ }
+}
+function curArtifact(){ return artifacts.find(a=>a.id===$('#infArt').value)||artifacts[0]; }
+function obsDisplay(a,name){
+  const conv=(a.channelConventions&&a.channelConventions[name])||(name.startsWith('Im_')?a.imagConvention:null);
+  return conv==='abs' ? '|'+name.replace('Im_','Im ')+'|' : name;
+}
+function renderObsForm(){
+  const a=curArtifact(); const host=$('#obsForm'); const scope=$('#infScope');
+  if(!a){ host.innerHTML=''; return; }
+  scope.hidden=false; scope.textContent=a.scopeNote||'';
+  host.innerHTML=a.obsNames.map(nm=>{
+    const val=a.fiducial[nm], sig=a.sigma[nm];
+    const lim=a.guards&&a.guards.xObsLimits&&a.guards.xObsLimits[nm];
+    return `<div class="ofield"><label>${obsDisplay(a,nm)}</label>`+
+      `<input class="mono" id="obs_${nm}" value="${val!=null?val:''}" inputmode="decimal" aria-label="${nm}">`+
+      `<span class="sig">±${sig!=null?fmt(sig):'—'}${lim?'  ['+lim[0]+','+lim[1]+']':''}</span></div>`;
+  }).join('');
+}
+async function runInfer(){
+  if(!backend){ openModal(); return; }
+  const a=curArtifact(); if(!a) return;
+  const btn=$('#runInfer'), rl=$('#runInfer .rl');
+  const x_obs={}; a.obsNames.forEach(nm=>{ const el=$('#obs_'+nm); if(el&&el.value!=='') x_obs[nm]=+el.value; });
+  btn.disabled=true; btn.classList.add('running'); rl.textContent='Sampling';
+  try{
+    const r=await api('/infer',{method:'POST',body:JSON.stringify({artifact:a.id,x_obs,nSamples:+$('#infN').value,seed:0})});
+    const inf=await r.json();
+    if(!r.ok) throw new Error((inf.detail&&inf.detail[0]&&(inf.detail[0].message||inf.detail[0]))||'inference failed');
+    infState=inf; drawCorner($('#corner'), inf); renderSummary(inf);
+  }catch(e){ renderGuards(null, e.message||'inference failed'); }
+  finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Sample posterior'; }
+}
+
+function drawCorner(cv, inf){
+  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
+  const W=box.clientWidth||520,H=box.clientHeight||520; cv.width=W*dpr;cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  if(!inf||!inf.samples||!inf.samples.length){ note(g,W,H,'sample the posterior'); return; }
+  const S=inf.samples, names=inf.paramNames, labs=(inf.paramLabels||names).map(texClean);
+  const D=names.length, pad=46, gap=3, botPad=22;
+  const cell=(Math.min(W,H)-pad-botPad)/D;
+  // per-param display range = [p1,p99]
+  const rng=names.map((_,c)=>{ const col=S.map(r=>r[c]).filter(isFinite).sort((a,b)=>a-b);
+    const q=p=>col[Math.max(0,Math.min(col.length-1,Math.floor(p*col.length)))];
+    let lo=q(0.005),hi=q(0.995); if(hi<=lo)hi=lo+1; return [lo,hi]; });
+  const px=(c,v)=>pad+c*cell+gap+((v-rng[c][0])/((rng[c][1]-rng[c][0])||1))*(cell-2*gap);
+  const py=(r,v)=>pad+r*cell+gap+(1-(v-rng[r][0])/((rng[r][1]-rng[r][0])||1))*(cell-2*gap);
+  const step=Math.max(1,Math.floor(S.length/1400));  // downsample scatter
+  for(let r=0;r<D;r++)for(let c=0;c<=r;c++){
+    const x0=pad+c*cell, y0=pad+r*cell;
+    g.strokeStyle=INKa(.14); g.lineWidth=1; g.strokeRect(x0+.5,y0+.5,cell-1,cell-1);
+    if(r===c){
+      // 1D histogram
+      const nb=22, lo=rng[c][0], hi=rng[c][1], bins=new Array(nb).fill(0);
+      S.forEach(row=>{ const v=row[c]; if(!isFinite(v))return; let b=Math.floor((v-lo)/((hi-lo)||1)*nb); b=Math.max(0,Math.min(nb-1,b)); bins[b]++; });
+      const mx=Math.max(...bins)||1;
+      g.fillStyle=hexA('#6E92A8',.55); g.strokeStyle='#6E92A8'; g.lineWidth=1; g.beginPath();
+      for(let b=0;b<nb;b++){ const x=x0+gap+(b/nb)*(cell-2*gap), w=(cell-2*gap)/nb, h=(bins[b]/mx)*(cell-2*gap-4);
+        g.fillRect(x, y0+cell-gap-h, w+.5, h); }
+      // median line
+      const med=(inf.summary[names[c]]||{}).median;
+      if(med!=null){ const mx2=px(c,med); g.strokeStyle='#E4322B'; g.lineWidth=1; g.beginPath(); g.moveTo(mx2,y0+gap); g.lineTo(mx2,y0+cell-gap); g.stroke(); }
+    } else {
+      // 2D scatter (param c on x, param r on y)
+      g.fillStyle=hexA('#22242A',.16);
+      for(let k=0;k<S.length;k+=step){ const vx=S[k][c],vy=S[k][r]; if(!isFinite(vx)||!isFinite(vy))continue;
+        g.fillRect(px(c,vx)-0.6, py(r,vy)-0.6, 1.4, 1.4); }
+    }
+    // labels on left column + bottom row
+    if(c===0){ g.save(); g.fillStyle=INK; g.font='8.5px '+monoStack(); g.textAlign='center';
+      g.translate(pad-12, y0+cell/2); g.rotate(-Math.PI/2); g.fillText(labs[r].slice(0,12),0,0); g.restore(); }
+    if(r===D-1){ g.fillStyle=INK; g.font='8.5px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
+      g.fillText(labs[c].slice(0,12), x0+cell/2, pad+D*cell+6); g.textBaseline='alphabetic'; }
+  }
+}
+function renderSummary(inf){
+  const host=$('#summTab'); const S=inf.summary, names=inf.paramNames, labs=inf.paramLabels||names, units=inf.paramUnits||[];
+  let html=`<div class="sh">Posterior · median ±68%</div>`;
+  names.forEach((nm,i)=>{ const s=S[nm]; if(!s){ return; }
+    const med=s.median, lo=s.p16, hi=s.p84;
+    html+=`<div class="srow"><span class="sp">${texClean(labs[i]).slice(0,16)}</span>`+
+      `<span class="sv">${fmtSig(med)}<span style="opacity:.45"> +${fmtSig(hi-med)}/−${fmtSig(med-lo)}</span>`+
+      `${units[i]?`<span class="su">${units[i]}</span>`:''}</span></div>`; });
+  const n=inf.nReturned, req=inf.nRequested;
+  html+=`<div class="srow"><span class="sp" style="opacity:.6">draws</span><span class="sv">${n}${n<req?` / ${req}`:''}</span></div>`;
+  host.innerHTML=html;
+  renderGuards(inf,null);
+}
+function renderGuards(inf, err){
+  const host=$('#infGuards'); if(!host) return;
+  if(err){ host.innerHTML=`<div class="gban">${String(err).slice(0,140)}</div>`; return; }
+  if(!inf){ host.innerHTML=''; return; }
+  let bans=[];
+  (inf.guards&&inf.guards.applied||[]).forEach(gd=>{ if(gd.type==='truncate'){
+    bans.push(`${(gd.droppedFraction*100).toFixed(1)}% of draws truncated to ${gd.param} ≥ ${gd.range[0]} (outside training support).`); } });
+  const lim=inf.guards&&inf.guards.xObsLimits||{};
+  Object.keys(lim).forEach(k=>bans.push(`conditioning domain: ${k} ∈ [${lim[k][0]}, ${lim[k][1]}].`));
+  if(inf.meta&&inf.meta.nTrain) bans.push(`amortized NPE · n_train ${(+inf.meta.nTrain).toLocaleString()} · seed ${inf.meta.seed}`);
+  host.innerHTML=bans.map((b,i)=>`<div class="gban${i===bans.length-1?' ok':''}">${b}</div>`).join('');
+}
+function fmtSig(v){ if(v==null||!isFinite(v))return '—'; const a=Math.abs(v);
+  return a>=1000?v.toExponential(2):a>=1?v.toFixed(2):a>=0.01?v.toFixed(3):v.toExponential(1); }
+
+/* ---- select helper + tool init/enable ---- */
+function fillSel(sel, pairs, selected){ const el=$(sel); if(!el) return;
+  el.innerHTML=pairs.map(([v,l])=>`<option value="${v}"${v===selected?' selected':''}>${l}</option>`).join(''); }
+function flashTool(sel,msg){ const n=$(sel); if(!n) return; n.hidden=false; n.innerHTML='<b>'+String(msg).slice(0,80)+'</b>'; }
+
+function initTools(){
+  fillSel('#exX', SWEEP_AXES.map(a=>[a.k, a.lab+(a.u?' ('+a.u+')':'')]), 'wOcean_ppt');
+  fillSel('#exY', SWEEP_AXES.map(a=>[a.k, a.lab+(a.u?' ('+a.u+')':'')]), 'Tb_K');
+  fillSel('#exZ', SWEEP_Z.map(z=>[z.k, z.lab+(z.u?' ('+z.u+')':'')]), 'D_km');
+  const setRange=(selId,x0,x1)=>{ const a=SWEEP_AXES.find(v=>v.k===$(selId).value); if(a){ $(x0).value=a.r[0]; $(x1).value=a.r[1]; } };
+  setRange('#exX','#exX0','#exX1'); setRange('#exY','#exY0','#exY1');
+  $('#exX').addEventListener('change',()=>setRange('#exX','#exX0','#exX1'));
+  $('#exY').addEventListener('change',()=>setRange('#exY','#exY0','#exY1'));
+  $('#exZ').addEventListener('change', repaintHeat);
+  $('#runGrid').onclick=runGrid;
+  $('#infArt').addEventListener('change', renderObsForm);
+  $('#runInfer').onclick=runInfer;
+  drawHeatmap($('#heat'),null); drawCorner($('#corner'),null);
+  toolsBackendState();
+}
+function toolsBackendState(){
+  const on=!!backend;
+  $('#exNeeds').hidden=on; $('#infNeeds').hidden=on;
+  if(on) loadArtifacts();
+}
+
+/* boot: try to auto-reconnect to a previously used backend, else sample */
+(async function boot(){
+  initBody(); loadSample(); initTools();
+  const saved=localStorage.getItem('mm');
+  if(saved){ try{ const {url,token}=JSON.parse(saved); const h=await probe(url,token);
+    backend={url,token,version:h.version}; setStatus('live','connected · PyALMA3'); $('#engine').textContent='engine '+h.version;
+    toolsBackendState();
+  }catch(_){ setStatus('sample','disconnected · sample'); } }
+})();
+</script>
+</body>
+</html>

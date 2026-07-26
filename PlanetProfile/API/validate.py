@@ -117,7 +117,9 @@ def validate_request(spec, eosTables='discover'):
         else:
             for axis in ('xName', 'yName'):
                 nm = ex.get(axis)
-                if nm is not None and nm not in EXPLORE_NAMES:
+                if nm is None:
+                    errors.append({'field': f'explore.{axis}', 'message': f'required for mode "{mode}"'})
+                elif nm not in EXPLORE_NAMES:
                     errors.append({'field': f'explore.{axis}', 'message': f'unknown sweep parameter "{nm}"'})
             zn = ex.get('zName')
             if zn is not None:
@@ -125,6 +127,16 @@ def validate_request(spec, eosTables='discover'):
                 for z in zlist:
                     if z not in EXPLORE_Z_NAMES:
                         errors.append({'field': 'explore.zName', 'message': f'unknown output "{z}"'})
+            # Grid counts must be positive ints; ranges must be 2-element numeric lists.
+            for cnt in ('nx', 'ny'):
+                v = ex.get(cnt)
+                if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v < 1):
+                    errors.append({'field': f'explore.{cnt}', 'message': 'must be a positive integer'})
+            for rng in ('xRange', 'yRange'):
+                v = ex.get(rng)
+                if v is not None and (not isinstance(v, list) or len(v) != 2
+                                      or any(isinstance(x, bool) or not isinstance(x, (int, float)) for x in v)):
+                    errors.append({'field': f'explore.{rng}', 'message': 'must be a [min, max] numeric pair'})
 
     # 5. EOS-table allowlist / path-traversal defense.
     allowed = known_eos_tables() if eosTables == 'discover' else eosTables

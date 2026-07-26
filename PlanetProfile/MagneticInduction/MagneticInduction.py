@@ -689,6 +689,17 @@ def GetBexc(bodyname, era, model, excSelection, MPmodel=None, nprmMax=1, pMax=0)
             log.warning('n\'_max greater than 1 is not yet supported. Be only up to n=1 will be loaded.')
             nprmMax = 1
 
+        # Excitation-moment files ship under the packaged Default/<Body>/inductionData (and
+        # Test/inductionData). GetBexc resolves a body path relative to cwd, which breaks when
+        # the caller has chdir'd elsewhere (e.g. the API worker isolating artifacts in a
+        # jobdir). Fall back to the packaged _Defaults copy so loading is cwd-independent. This
+        # runs before the cache write below, so a warm worker never caches a missed (None) load.
+        if bodyname[:4] != 'Test' and not os.path.isfile(os.path.join(fPath, f'{fNames[0]}.txt')):
+            fallbackPath = os.path.join(_Defaults, bodyname, 'inductionData')
+            if os.path.isfile(os.path.join(fallbackPath, f'{fNames[0]}.txt')):
+                log.debug(f'{bodyname} excitation files not found under cwd; using packaged {fallbackPath}.')
+                fPath = fallbackPath
+
         if os.path.isfile(os.path.join(fPath, f'{fNames[0]}.txt')):
             inpTexc_hr, inpBenm_nT, B0_nT, BeNames, Bexyz_nT = GetBenm(nprmMax, pMax, fpath=fPath,
                                                                     fName=fNames[0])

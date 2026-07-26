@@ -35,6 +35,68 @@ def _emit(obj):
     _REAL_STDOUT.flush()
 
 
+def _run_single(spec, jobdir, jobid, engine, pristineParams, emit):
+    """ mode=single: run the forward interior model once and serialize the profile. """
+    from PlanetProfile.API import mapper, results as resultsmod
+
+    Params = mapper.apply_run_flags(spec, pristineParams)
+    Planet = mapper.build_planet(spec)              # whitelist mapper; never importlib
+
+    os.chdir(jobdir)                                # isolate all engine file writes here
+    emit({'type': 'progress', 'id': jobid, 'stage': 'run', 'percent': 5})
+    Planet, Params = engine.PlanetProfile(Planet, Params)
+    emit({'type': 'progress', 'id': jobid, 'stage': 'write', 'percent': 95})
+
+    manifest = resultsmod.build_manifest(jobdir)
+    result = resultsmod.extract_single(Planet, manifest=manifest)
+    resultsmod.write_result_json(result, jobdir)
+
+    return {'type': 'result', 'id': jobid,
+            'status': 'succeeded' if result['meta']['valid'] else 'invalid',
+            'summary': result['summary'],
+            'meta': result['meta'],
+            'manifest': manifest}
+
+
+def _run_exploreogram(spec, jobdir, jobid, engine, pristineParams, emit):
+    """ mode=exploreogram: run a 2-D interior-structure sweep and serialize the grid.
+
+        Uses the importlib-free engine entry point RunExploreGrid. Grids run single-process
+        (nested spawn-Pool inside a worker subprocess is the cross-platform hazard the
+        CLAUDE.md flags; the server already runs several concurrent workers). Induction and
+        gravity are forced off per cell: an ExploreOgram maps interior structure, the
+        induction sweep is the separate inductogram mode, and grid induction extraction
+        dereferences None when moments weren't computed.
+    """
+    from PlanetProfile.API import mapper, results as resultsmod
+
+    Params = mapper.apply_run_flags(spec, pristineParams)   # sets DO_EXPLOREOGRAM from mode
+    Params = mapper.apply_explore_params(spec, Params)
+    Params.DO_PARALLEL = False
+    Params.SKIP_INDUCTION = True
+    Params.SKIP_GRAVITY = True
+    Params = mapper.neutralize_induction(Params)
+    Planet = mapper.build_planet(spec)
+
+    os.chdir(jobdir)
+    emit({'type': 'progress', 'id': jobid, 'stage': 'grid', 'percent': 5})
+    Exploration, Params = engine.RunExploreGrid(Planet, Params)
+    emit({'type': 'progress', 'id': jobid, 'stage': 'write', 'percent': 95})
+
+    manifest = resultsmod.build_manifest(jobdir)
+    result = resultsmod.extract_grid(Exploration, Params, manifest=manifest)
+    resultsmod.write_result_json(result, jobdir)
+
+    valid = result['meta']['valid']
+    return {'type': 'result', 'id': jobid,
+            'status': 'succeeded' if valid else 'invalid',
+            'summary': {'mode': 'exploreogram', 'nx': result['meta']['nx'],
+                        'ny': result['meta']['ny'], 'valid': valid,
+                        'zNames': result['meta']['zNames']},
+            'meta': result['meta'],
+            'manifest': manifest}
+
+
 def run_job(spec, jobdir, jobid, engine, pristineParams, emit=_emit):
     """ Run a single job in jobdir and return the terminal result dict (also emitted).
 
@@ -42,7 +104,7 @@ def run_job(spec, jobdir, jobid, engine, pristineParams, emit=_emit):
         wiring up pipes. ``engine`` is the imported Main module; ``pristineParams`` is the
         untouched global Params snapshot (never mutated -- each job gets a fresh deepcopy).
     """
-    from PlanetProfile.API import mapper, validate, results as resultsmod
+    from PlanetProfile.API import mapper, validate
 
     startCwd = os.getcwd()
     os.makedirs(jobdir, exist_ok=True)
@@ -55,29 +117,14 @@ def run_job(spec, jobdir, jobid, engine, pristineParams, emit=_emit):
                               'fields': verrors}}
 
         mode = (spec.get('mode') or 'single').lower()
-        if mode != 'single':
-            return {'type': 'result', 'id': jobid, 'status': 'failed',
-                    'error': {'code': 'unsupported_mode',
-                              'message': f'mode "{mode}" is not yet handled by the worker '
-                                         '(grid modes land with the Phase 4 backend)'}}
-
-        Params = mapper.apply_run_flags(spec, pristineParams)
-        Planet = mapper.build_planet(spec)          # whitelist mapper; never importlib
-
-        os.chdir(jobdir)                            # isolate all engine file writes here
-        emit({'type': 'progress', 'id': jobid, 'stage': 'run', 'percent': 5})
-        Planet, Params = engine.PlanetProfile(Planet, Params)
-        emit({'type': 'progress', 'id': jobid, 'stage': 'write', 'percent': 95})
-
-        manifest = resultsmod.build_manifest(jobdir)
-        result = resultsmod.extract_single(Planet, manifest=manifest)
-        resultsmod.write_result_json(result, jobdir)
-
-        return {'type': 'result', 'id': jobid,
-                'status': 'succeeded' if result['meta']['valid'] else 'invalid',
-                'summary': result['summary'],
-                'meta': result['meta'],
-                'manifest': manifest}
+        if mode == 'single':
+            return _run_single(spec, jobdir, jobid, engine, pristineParams, emit)
+        if mode == 'exploreogram':
+            return _run_exploreogram(spec, jobdir, jobid, engine, pristineParams, emit)
+        return {'type': 'result', 'id': jobid, 'status': 'failed',
+                'error': {'code': 'unsupported_mode',
+                          'message': f'mode "{mode}" is not handled by the worker '
+                                     '(supported: single, exploreogram)'}}
     except mapper.MappingError as e:
         return {'type': 'result', 'id': jobid, 'status': 'failed',
                 'error': {'code': 'mapping_error', 'message': 'request references disallowed attributes',

@@ -13,7 +13,7 @@ from PlanetProfile.API.pool import WorkerPool, WorkerCrashed
 from PlanetProfile.API.server.config import ServerConfig
 from PlanetProfile.API.server.registry import JobRegistry, TERMINAL
 from PlanetProfile.API.server.security import HostGuardMiddleware, PrivateNetworkMiddleware
-from PlanetProfile.API.server import routes_meta, routes_runs, routes_events, routes_artifacts
+from PlanetProfile.API.server import routes_meta, routes_runs, routes_events, routes_artifacts, routes_infer
 
 log = logging.getLogger('PlanetProfile.API.server')
 
@@ -144,6 +144,7 @@ def build_app(config: ServerConfig) -> FastAPI:
     app.include_router(routes_runs.router)
     app.include_router(routes_events.router)
     app.include_router(routes_artifacts.router)
+    app.include_router(routes_infer.router)
 
     if config.static_dir and os.path.isdir(config.static_dir):
         app.mount('/', StaticFiles(directory=config.static_dir, html=True), name='frontend')

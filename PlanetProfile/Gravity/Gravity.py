@@ -196,6 +196,24 @@ def ComputeGravityObservations(Planet, Params):
     Torb_kyr = Torb_s / ALMA_TIME_UNIT_S
     eccentricity = float(Planet.Bulk.eccentricity)
     r, phase, rho, mu, vis = GravityModelArrays(Planet)
+    omega = 2 * np.pi / Torb_s
+
+    # Regularize inviscid fluid (ocean) layers before propagating the ALMA solution.
+    # Ocean layers are modeled with the 'newton' rheology (mu_s = eta * s = eta * i*omega)
+    # and carry the true water viscosity (eta ~ 1e-3 Pa*s). At the tidal forcing frequency
+    # this gives an effective rigidity mu_s = eta*omega ~ 4e-8 Pa, i.e. essentially zero.
+    # The ALMA propagator/inverse matrices contain terms ~ r/mu_s, so a near-zero fluid
+    # rigidity makes them singular (r/mu_s ~ 1e14) and, propagated across the ~50 ocean
+    # sublayers, overflows into garbage Love numbers (the historical k2 ~ -60-10j bug).
+    # Impose a small floor on the fluid-layer *effective rigidity*: mu_s >= FLUID_SHEAR_FLOOR_Pa.
+    # The floor (100 Pa) is >> the physical ocean rigidity yet still ~7 orders of magnitude
+    # below ice/rock (~1e9-1e10 Pa), so the layer stays fluid; the degree-2 Love numbers sit
+    # on a broad plateau (verified stable for mu_s ~ 10-1e3 Pa), while conditioning is restored.
+    FLUID_SHEAR_FLOOR_Pa = 100.0
+    vis = np.array(vis, dtype=float, copy=True)
+    fluidLayers = mu <= 0.0  # fluid/ocean layers have zero shear modulus (VS = 0 -> GS = 0)
+    if np.any(fluidLayers):
+        vis[fluidLayers] = np.maximum(vis[fluidLayers], FLUID_SHEAR_FLOOR_Pa / omega)
 
     model_params = pyALMA3Updated.build_model(r, rho, mu, vis, Planet.Gravity.rheology,
                                        Planet.Gravity.pyAlmaParams, norm=False)
@@ -212,6 +230,8 @@ def ComputeGravityObservations(Planet, Params):
     # Passing Torb_kyr instead would inflate omega by t0 (~3.156e10) and silently corrupt
     # the imaginary parts of h2/l2/k2 and every derived dissipation/libration quantity.
     # (Torb_kyr is kept only as stored metadata in Planet.Gravity.time_log_kyrs above.)
+    # NOTE: numerical stability additionally requires the fluid-layer regularization applied
+    # above; without it the SI/norm=False propagation is singular over the ocean.
     h, l, k, y = pyALMA3Updated.love_numbers(model_params, [2], [Torb_s], 'tidal',
                                       'periodic', Params.Gravity.gorder,
                                       verbose=(not Params.QUIET_ALMA and Params.Gravity.verbose),
@@ -226,7 +246,6 @@ def ComputeGravityObservations(Planet, Params):
     g0 = Constants.G * Planet.Bulk.M_kg / Planet.Bulk.R_m**2
     Planet.Gravity.y1 = np.real(y[:, 0]) * Planet.Bulk.M_kg / Planet.Bulk.R_m / g0
 
-    omega = 2 * np.pi / Torb_s
     libration_r, libration_rho, ocean_idx, libration_y1 = LibrationModelInputs(
         r, phase, rho, Planet.Gravity.y1)
     Planet.Gravity.libration_m = librations(libration_r, libration_rho, omega,

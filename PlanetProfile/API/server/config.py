@@ -25,7 +25,8 @@ class ServerConfig:
     static_dir: Optional[str] = None        # frontend bundle to serve same-origin at /
     job_timeout_s: float = 3600.0           # per-job wall-clock cap -> kill+respawn
     max_grid_cells: int = 4000              # reject explore grids larger than this
-    max_body_bytes: int = 1_000_000         # request-body cap
+    max_body_bytes: int = 4_000_000         # request-body cap (corner-plot payloads are larger)
+    max_infer_samples: int = 50000          # bound posterior-sample payload size
     jobdir_ttl_s: float = 24 * 3600.0       # reaper deletes jobdirs older than this
 
     @property

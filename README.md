@@ -28,13 +28,14 @@ We'd also love to hear about your work — reach the PlanetProfile team at steve
 Relative to upstream PlanetProfile, this fork contributes:
 
 - **A declarative JSON API boundary** (`PlanetProfile/API/`). A whitelist mapper builds the engine's `PlanetStruct` from plain JSON — never by importing a user `PP<Body>.py` file — and a thin `ppworker` harness runs models over stdin/stdout, so the engine can be driven safely by a server or UI. Verified to reproduce a CLI run bit-for-bit.
-- **A local backend** (`PlanetProfile/API/server/`, FastAPI + uvicorn). A loopback-only HTTP/JSON + SSE server that fronts the engine through a warm pool of `ppworker` subprocesses — submit a model as JSON, watch progress over Server-Sent Events, and pull back results + artifacts. Loopback-bound with a per-session token, CORS/PNA handling for a GitHub-Pages frontend, and one job per worker (the engine is non-reentrant). See [Running the local backend](#running-the-local-backend).
+- **A local backend** (`PlanetProfile/API/server/`, FastAPI + uvicorn). A loopback-only HTTP/JSON + SSE server that fronts the engine through a warm pool of `ppworker` subprocesses — submit a model as JSON, watch progress over Server-Sent Events, and pull back results + artifacts. Loopback-bound with a per-session token, CORS/PNA handling for a GitHub-Pages frontend, and one job per worker (the engine is non-reentrant). Beyond single models it also serves **2-D ExploreOgram grid sweeps** and **amortized Bayesian inference** (`/infer`, sampling the downloaded SBI posteriors). See [Running the local backend](#running-the-local-backend).
+- **A browser frontend** (`frontend/index.html`). A single self-contained page — no build step, no external assets — that drives the backend and renders results as an engineering cross-section "plate": a to-scale radial interior diagram plus the full figure suite (structure, thermodynamics, seismic, electrical, **tidal Love numbers**, **magnetic-induction response**), a **2-D sweep heatmap** (ExploreOgram, with contours), and a **posterior corner plot** for Bayesian inference. It talks to the loopback backend with a session token; the backend can serve it same-origin via `--static-dir frontend`.
 - **LaTeX-free plotting.** Every figure renders through matplotlib's built-in mathtext, so no LaTeX/siunitx installation is needed for headless or server-side plot generation.
 - **Bayesian interior inference** (`PlanetProfile.Inference`). MCMC (pocoMC) and simulation-based inference (`sbi`/`torch`) constrain interior parameters against tidal Love numbers, gravity, and magnetic-induction observables, with a full suite of posterior and diagnostic figures. Optional — `pip install -e ".[inference]"`.
 - **A stabilized engine.** Imports cleanly on modern Python, is safe to call repeatedly within one long-lived process (per-run config isolation), no longer blocks on import-time stdin prompts, and ships with a regression-test suite (`tests/`). The full `BuildTest` physics suite runs green.
 - **A much smaller repository.** The frozen MATLAB implementation is archived under `legacy-matlab/`, large binary data was purged from git history (`.git` shrank ~94%), and the Perple_X EOS tables are fetched on install rather than committed.
 
-**Planned (see the spec):** a **static GitHub-Pages frontend** that talks to the local backend at `127.0.0.1` and renders results in-browser (the `frontend/` directory is a scaffold for that bundle). The backend itself is built (`PlanetProfile/API/server/`).
+The backend (`PlanetProfile/API/server/`) and the browser frontend (`frontend/index.html`) are both built; point the server at the page with `--static-dir frontend` and open the printed loopback URL. **In progress (see the spec):** the InductOgram σ×D induction-sweep mode (the ExploreOgram interior sweep is wired end-to-end) and packaging the page for static GitHub-Pages hosting against a user's local backend.
 
 ---
 
@@ -118,12 +119,21 @@ On startup it prints the loopback URL and a random **session token**; every requ
 |---|---|
 | `GET /health` | liveness + worker/EOS-cache readiness (unauthenticated, so the frontend can detect it) |
 | `GET /bodies` · `/schema` · `/schema/{body}` | body list, input/output schema + enums, per-body default inputs |
-| `POST /runs` | submit a model as JSON → `202 {id}` (or `422` with field-level errors) |
+| `POST /runs` | submit a model as JSON → `202 {id}` — `mode:"single"` or `mode:"exploreogram"` (2-D grid sweep); `422` with field-level errors |
 | `GET /runs/{id}/events` | Server-Sent Events progress stream |
 | `GET /runs/{id}` · `/result` · `/artifacts` · `/artifacts/{name}` | status, result JSON, artifact manifest + download |
 | `DELETE /runs/{id}` | cancel (kills + respawns the worker) |
+| `GET /infer/artifacts` · `/infer/artifacts/{id}` | list the downloaded SBI posteriors + per-artifact observables, priors, and deploy guards |
+| `POST /infer` | condition a posterior on observables → posterior samples + summary (amortized; sub-second) |
 
-It binds `127.0.0.1`/`::1` **only**, runs one job per warm worker (the engine is non-reentrant), and validates every request up front. It can also serve a static frontend bundle same-origin with `--static-dir <dir>` (the zero-CORS path). See [`docs/spec`](docs/spec/MoonMelodies_Spec_and_Refactor.md) §3/§5 for the full contract.
+It binds `127.0.0.1`/`::1` **only**, runs one job per warm worker (the engine is non-reentrant), and validates every request up front. To use the browser UI, serve it same-origin (the zero-CORS path) and open the printed URL:
+
+```bash
+python -m PlanetProfile.API.server --workers 4 --static-dir frontend
+# → open http://127.0.0.1:8787/ and paste the session token when prompted
+```
+
+See [`docs/spec`](docs/spec/MoonMelodies_Spec_and_Refactor.md) §3/§5 for the full contract.
 
 **Robustness & limits.** The backend has been audited across sanity, memory, speed, and robustness: a killed worker is respawned and the pool keeps serving, cancellation and timeouts kill+respawn cleanly, and malformed / oversized / unauthenticated / path-traversal requests are rejected with the right status while the server stays up (server RSS stays flat across jobs). Tunable safeguards: `--workers` (default `cpu−2`), `--job-timeout` (per-job wall-clock → kill+respawn), plus internal caps on request-body size and grid cells, a job-retention reaper + count cap, and **worker recycling** (a worker is respawned after a set number of jobs to bound the engine's per-run memory growth in a long-lived process).
 
@@ -152,7 +162,7 @@ Most of these install via the commands above; the links are for manual installs 
 | `PlanetProfile/API/` | The MoonMelodies JSON API boundary (mapper, validation, schema, results, `ppworker`) + the worker `pool` and the FastAPI `server/`. |
 | `PlanetProfile/Inference/` | Bayesian interior inference (MCMC + SBI). |
 | `legacy-matlab/` | The frozen MATLAB implementation, archived (imported by nothing in Python). |
-| `frontend/`, `backend/` | Scaffolds for the planned static web UI (the FastAPI backend itself lives in `PlanetProfile/API/server/`). |
+| `frontend/index.html` | The browser UI — a single self-contained page (inline CSS/JS, no build step) that drives the backend and renders the interior plate, figure suite, ExploreOgram heatmap, and inference corner plots. |
 | `docs/spec/` | The MoonMelodies spec & refactor plan. |
 | `tests/` | Regression tests. |
 | `configs/`, `data-assets/` | Configuration and data-manifest scaffolding. |

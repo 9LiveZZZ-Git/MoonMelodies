@@ -170,6 +170,52 @@ def apply_run_flags(spec, Params):
     return Params
 
 
+# Whitelisted ExploreParamsStruct fields a grid request may set. xName/yName/zName are
+# already enum-checked by validate.validate_request; the ranges/counts are plain data.
+_EXPLORE_KEYS = frozenset({
+    'xName', 'yName', 'zName', 'xRange', 'yRange', 'nx', 'ny',
+    'exploreLogScale', 'oceanCompRangeList', 'contourName',
+})
+
+
+def apply_explore_params(spec, Params):
+    """ Populate Params.Explore from spec['explore'] for an exploreogram grid run.
+
+        Mutates Params in place (the caller passes a deepcopy from apply_run_flags) and
+        returns it. Only known ExploreParamsStruct fields may be set; anything else raises
+        MappingError so a request can't reach into arbitrary Params state. When induction
+        is not requested, the caller separately neutralizes Params.Induct.excSelectionCalc
+        so ExtractResults skips induction extraction (which dereferences None otherwise).
+    """
+    ex = spec.get('explore') or {}
+    if not isinstance(ex, dict):
+        raise MappingError([{'field': 'explore', 'message': 'expected an object'}])
+    if getattr(Params, 'Explore', None) is None:
+        raise MappingError([{'field': 'explore', 'message': 'server Explore config is unavailable'}])
+
+    errors = []
+    for key, val in ex.items():
+        if key not in _EXPLORE_KEYS:
+            errors.append({'field': f'explore.{key}', 'message': 'unknown explore setting'})
+            continue
+        setattr(Params.Explore, key, val)
+    if errors:
+        raise MappingError(errors)
+    return Params
+
+
+def neutralize_induction(Params):
+    """ Set every Params.Induct.excSelectionCalc flag False so grid extraction skips the
+        induction path (Benm2absBexyz dereferences None when moments weren't computed). """
+    try:
+        sel = Params.Induct.excSelectionCalc
+        if isinstance(sel, dict):
+            Params.Induct.excSelectionCalc = {k: False for k in sel}
+    except AttributeError:
+        pass
+    return Params
+
+
 # ---------------------------------------------------------------------------
 # Build-time helper: turn an (un-run) Planet into a minimal request spec. Used to
 # generate the curated /schema/{body} defaults from a PP<Body>.py Planet WITHOUT

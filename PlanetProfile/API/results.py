@@ -185,6 +185,78 @@ def extract_single(Planet, manifest=None, figures=None):
     }
 
 
+# Curated 2-D scalar fields the grid may expose for coloring the heatmap. Only those
+# actually present (non-None) on the extracted base struct are emitted; the requested
+# zName(s) are always included first so the client's default coloring is available.
+_GRID_FIELDS = [
+    'D_km', 'zb_km', 'CMR2mean', 'Mtot_kg', 'Tmean_K', 'sigmaMean_Sm',
+    'rhoOceanMean_kgm3', 'rhoSilMean_kgm3', 'rhoCoreMean_kgm3', 'Rcore_km',
+    'zSeafloor_km', 'eLid_km', 'Pseafloor_MPa', 'phiSeafloor_frac',
+    'kLoveAmp', 'hLoveAmp', 'lLoveAmp',
+]
+
+
+def extract_grid(Exploration, Params, manifest=None):
+    """ Build the ExploreOgram grid result dict (spec section 3.3) from a completed
+        ExplorationResultsStruct. Every z field is a 2-D (nx x ny) array; invalid cells
+        are null (NaN->null), complex Love numbers become {re, im}. """
+    base = Exploration.base
+
+    def grid2d(name):
+        arr = getattr(base, name, None)
+        return None if arr is None else to_jsonable(np.asarray(arr))
+
+    zName = getattr(Params.Explore, 'zName', None)
+    zNames = list(zName) if isinstance(zName, (list, tuple)) else ([zName] if zName else [])
+
+    wanted = []
+    for nm in [z for z in zNames if z] + _GRID_FIELDS:
+        if nm not in wanted and getattr(base, nm, None) is not None:
+            wanted.append(nm)
+
+    grid = {nm: grid2d(nm) for nm in wanted}
+    grid['VALID'] = grid2d('VALID')
+    grid['invalidReason'] = grid2d('invalidReason')
+
+    validGrid = getattr(base, 'VALID', None)
+    valid = bool(np.any(np.asarray(validGrid))) if validGrid is not None else False
+    logScale = getattr(Params.Explore, 'exploreLogScale', []) or []
+
+    return {
+        'meta': {
+            'body': Exploration.bodyname,
+            'bodyname': Exploration.bodyname,
+            'mode': 'exploreogram',
+            'valid': valid,
+            'nx': int(Exploration.nx), 'ny': int(Exploration.ny),
+            'xName': Exploration.xName, 'yName': Exploration.yName,
+            'zNames': [z for z in zNames if z],
+            'availableZ': wanted,
+            'artifacts': manifest if manifest is not None else [],
+        },
+        'grid': grid,
+        'axes': {
+            'xData': grid2d_from(Exploration.xData),
+            'yData': grid2d_from(Exploration.yData),
+            'xScale': 'log' if Exploration.xName in logScale else 'linear',
+            'yScale': 'log' if Exploration.yName in logScale else 'linear',
+            'xUnits': getattr(Exploration, 'xUnits', None),
+            'yUnits': getattr(Exploration, 'yUnits', None),
+        },
+        'moi': {
+            'CMR2str': getattr(Exploration, 'CMR2str', None),
+            'Cmeasured': to_jsonable(getattr(Exploration, 'Cmeasured', None)),
+            'Cupper': to_jsonable(getattr(Exploration, 'Cupper', None)),
+            'Clower': to_jsonable(getattr(Exploration, 'Clower', None)),
+        },
+    }
+
+
+def grid2d_from(arr):
+    """ to_jsonable an axis mesh (2-D ndarray) or None. """
+    return None if arr is None else to_jsonable(np.asarray(arr))
+
+
 def build_manifest(jobdir, hrefBase=None):
     """ Enumerate on-disk artifacts under jobdir as [{name, kind, mime, bytes, href}].
 

@@ -1520,7 +1520,19 @@ def GridPlanetProfileFunc(FuncName, PlanetGrid, Params):
                 PlanetList1D[i].Do.VALID = False
     else:
         log.profile('Running grid without parallel processing. This may take some time.')
-        PlanetList1D = np.array([FuncName(deepcopy(Planet), deepcopy(Params)) for Planet in PlanetList1D])[:, 0]
+        # Isolate per-model failures exactly as the parallel branch does: a single bad cell
+        # (e.g. a degenerate profile that trips a spline solve) marks that model invalid and
+        # leaves the rest of the grid intact, instead of aborting the whole sweep.
+        results = []
+        for i, Planet in enumerate(PlanetList1D):
+            try:
+                results.append(FuncName(deepcopy(Planet), deepcopy(Params))[0])
+            except Exception as e:
+                log.warning(f'Sequential grid model {i} failed ({type(e).__name__}: {e}); marking that model invalid and keeping the rest of the grid.')
+                Planet.Do.VALID = False
+                Planet.invalidReason = f'{type(e).__name__}: {e}'
+                results.append(Planet)
+        PlanetList1D = np.array(results, dtype=object)
 
     PlanetGrid = np.reshape(PlanetList1D, np.shape(PlanetGrid))
 
@@ -1708,6 +1720,79 @@ def ReloadMonteCarloResults(bodyname, Params, fNameOverride=None):
     return MCResults, Params
 
 
+def RunExploreGrid(Planet, Params):
+    """ Run the 2-D ExploreOgram sweep from an already-built base Planet.
+
+        This is the file- and importlib-independent core of ExploreOgram: it builds the
+        xList/yList from Params.Explore, runs ParPlanetExplore -> GetLayerMeans ->
+        ExtractResults, and returns the populated ExplorationResultsStruct (plus the
+        mutated Params carrying DataFiles/FigureFiles). The API worker calls this directly
+        so a grid run never imports a user PP file. Assumes Params.Explore
+        (xName/yName/zName/xRange/yRange/nx/ny + provideExploreRange/exploreLogScale) is
+        already populated and Planet is a complete base model.
+    """
+    Exploration = ExplorationResultsStruct()
+    Exploration.xName = Params.Explore.xName
+    Exploration.yName = Params.Explore.yName
+    Exploration.zName = Params.Explore.zName
+    Planet, DataFiles, FigureFiles = SetupFilenames(Planet, Params,
+        exploreAppend=f'{Exploration.xName}{Params.Explore.xRange[0]}_{Params.Explore.xRange[1]}_{Exploration.yName}{Params.Explore.yRange[0]}_{Params.Explore.yRange[1]}',
+        figExploreAppend=Params.Explore.zName)
+
+    if Params.Explore.xName in Params.Explore.provideExploreRange.keys():
+        xList = getattr(Params.Explore, Params.Explore.provideExploreRange[Params.Explore.xName])
+        if xList is None:
+            raise ValueError(f'Params.Explore.provideExploreRange[{Params.Explore.xName}] is not set. Please set it to the list of values to explore over.')
+        xList = [s.strip() if isinstance(s, str) else s for s in xList]
+        Params.Explore.nx = len(xList)
+    else:
+        if Exploration.xName in Params.Explore.exploreLogScale:
+            xList = np.logspace(Params.Explore.xRange[0], Params.Explore.xRange[1], Params.Explore.nx)
+        else:
+            xList = np.linspace(Params.Explore.xRange[0], Params.Explore.xRange[1], Params.Explore.nx)
+    if Params.Explore.yName in Params.Explore.provideExploreRange.keys():
+        yList = getattr(Params.Explore, Params.Explore.provideExploreRange[Params.Explore.yName])
+        if yList is None:
+            raise ValueError(f'Params.Explore.provideExploreRange[{Params.Explore.yName}] is not set. Please set it to the list of values to explore over.')
+        yList = [s.strip() if isinstance(s, str) else s for s in yList]
+        Params.Explore.ny = len(yList)
+    else:
+        if Exploration.yName in Params.Explore.exploreLogScale:
+            yList = np.logspace(Params.Explore.yRange[0], Params.Explore.yRange[1], Params.Explore.ny)
+        else:
+            yList = np.linspace(Params.Explore.yRange[0], Params.Explore.yRange[1], Params.Explore.ny)
+
+    Params.nModels = Params.Explore.nx * Params.Explore.ny
+    Exploration.xData = xList
+    Exploration.yData = yList
+    if not Params.SKIP_INNER:
+        log.warning('Running explore-o-gram with interior calculations, which will be slow.')
+    if not Params.NO_SAVEFILE:
+        log.warning('Params.NO_SAVEFILE is False. Individual Planet runs will be saved. This can lead to '
+                    'large disk usage as each valid Planet run is saved to disk.')
+
+    Params.ALLOW_BROKEN_MODELS = True
+    tStart = time.time()
+    Params.EXPLOREOGRAM_IN_PROGRESS = True
+    PlanetGrid = ParPlanetExplore(Planet, Params, xList, yList)
+    Params.EXPLOREOGRAM_IN_PROGRESS = False
+    log.info(f'Parallel run elapsed time: {time.time() - tStart:.1f} s.')
+
+    # Calculate additional parameters from profiles
+    gridShape = np.shape(PlanetGrid)
+    PlanetList = np.reshape(PlanetGrid, -1)
+    PlanetList, Params = GetLayerMeans(PlanetList, Params)
+    PlanetGrid = np.reshape(PlanetList, gridShape)
+
+    Exploration = ExtractResults(Exploration, PlanetGrid, Params)
+    if not np.any(Exploration.base.VALID):
+        log.warning('No valid models appeared for the given input settings in this ExploreOgram.')
+
+    Params.DataFiles = DataFiles
+    Params.FigureFiles = FigureFiles
+    return Exploration, Params
+
+
 def ExploreOgram(bodyname, Params, fNameOverride=None, RETURN_GRID=False, Magnetic=None):
     """ Run PlanetProfile models over a variety of settings to get interior
         properties for each input.
@@ -1745,69 +1830,9 @@ def ExploreOgram(bodyname, Params, fNameOverride=None, RETURN_GRID=False, Magnet
                 Planet, Params = SetupInduction(Planet, Params)
 
 
-        Exploration = ExplorationResultsStruct()
-        Exploration.xName = Params.Explore.xName
-        Exploration.yName = Params.Explore.yName
-        Exploration.zName = Params.Explore.zName
-        Planet, DataFiles, FigureFiles = SetupFilenames(Planet, Params, exploreAppend=f'{Exploration.xName}{Params.Explore.xRange[0]}_{Params.Explore.xRange[1]}_{Exploration.yName}{Params.Explore.yRange[0]}_{Params.Explore.yRange[1]}',
-                                                figExploreAppend=Params.Explore.zName)
-
-        if Params.Explore.xName in Params.Explore.provideExploreRange.keys():
-            xList = getattr(Params.Explore, Params.Explore.provideExploreRange[Params.Explore.xName])
-            if xList is None:
-                raise ValueError(f'Params.Explore.provideExploreRange[{Params.Explore.xName}] is not set. Please set it to the list of values to explore over.')
-            xList = [s.strip() if isinstance(s, str) else s for s in xList]
-            Params.Explore.nx = len(xList)
-        else:
-            if Exploration.xName in Params.Explore.exploreLogScale:
-                xList = np.logspace(Params.Explore.xRange[0], Params.Explore.xRange[1], Params.Explore.nx)
-            else:
-                xList = np.linspace(Params.Explore.xRange[0], Params.Explore.xRange[1], Params.Explore.nx)
-        if Params.Explore.yName in Params.Explore.provideExploreRange.keys():
-            yList = getattr(Params.Explore, Params.Explore.provideExploreRange[Params.Explore.yName])
-            if yList is None:
-                raise ValueError(f'Params.Explore.provideExploreRange[{Params.Explore.yName}] is not set. Please set it to the list of values to explore over.')
-            yList = [s.strip() if isinstance(s, str) else s for s in yList]
-            Params.Explore.ny = len(yList)
-        else:
-            if Exploration.yName in Params.Explore.exploreLogScale:
-                yList = np.logspace(Params.Explore.yRange[0], Params.Explore.yRange[1], Params.Explore.ny)
-            else:
-                yList = np.linspace(Params.Explore.yRange[0], Params.Explore.yRange[1], Params.Explore.ny)
-
-        Params.nModels = Params.Explore.nx * Params.Explore.ny
-        Exploration.xData = xList
-        Exploration.yData = yList
-        if not Params.SKIP_INNER:
-            log.warning('Running explore-o-gram with interior calculations, which will be slow.')
-        
-        if not Params.NO_SAVEFILE:
-            log.warning(f'Params.NO_SAVEFILE is False. Individual Planet runs will be saved. This can lead to large disk usage as each valid Planet run is saved to disk.')
-
-        Params.ALLOW_BROKEN_MODELS = True
-
-        tMarks = np.append(tMarks, time.time())
-        Params.EXPLOREOGRAM_IN_PROGRESS = True
-        PlanetGrid = ParPlanetExplore(Planet, Params, xList, yList)
-        Params.EXPLOREOGRAM_IN_PROGRESS = False
-        tMarks = np.append(tMarks, time.time())
-        dt = tMarks[-1] - tMarks[-2]
-        log.info(f'Parallel run elapsed time: {dt:.1f} s.')
-
-        # Calculate additional parameters from profiles
-        gridShape = np.shape(PlanetGrid)
-        PlanetList = np.reshape(PlanetGrid, -1)
-        PlanetList, Params = GetLayerMeans(PlanetList, Params)
-        PlanetGrid = np.reshape(PlanetList, gridShape)
-        
-        Exploration = ExtractResults(Exploration, PlanetGrid, Params)
-
-        
-        if not np.any(Exploration.base.VALID):
-            log.warning('No valid models appeared for the given input settings in this ExploreOgram.')
-
-        Params.DataFiles = DataFiles
-        Params.FigureFiles = FigureFiles
+        # Single engine authority for the grid build lives in RunExploreGrid (also the
+        # importlib-free entry point the API worker uses).
+        Exploration, Params = RunExploreGrid(Planet, Params)
         WriteResults(Exploration, Params.DataFiles.exploreOgramFile, Params.SAVE_AS_MATLAB, Params.DataFiles.exploreOgramMatFile)
     else:
         log.info(f'Reloading explore-o-gram for {bodyname}.')

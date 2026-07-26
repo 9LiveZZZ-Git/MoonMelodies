@@ -127,14 +127,17 @@ def GetLayerMeans(PlanetList, Params):
     # Get flags to pass on regarding types of layers we have
     Params.yesPorousRock = np.any([Planet.Do.POROUS_ROCK for Planet in PlanetList])
     Params.yesPorousIce = np.any([Planet.Do.POROUS_ICE for Planet in PlanetList])
-    Params.yesClath = np.any([np.any(np.logical_and(Planet.phase >= Constants.phaseClath, Planet.phase < Constants.phaseClath + 10)) for Planet in PlanetList])
-    Params.yesIceII = np.any([np.any(Planet.phase == 2) for Planet in PlanetList])
-    Params.yesIceIIIund = np.any([np.any(Planet.phase == -3) for Planet in PlanetList])
-    Params.yesIceIII = np.any([np.any(Planet.phase == 3) for Planet in PlanetList])
-    Params.yesIceVund = np.any([np.any(Planet.phase == -5) for Planet in PlanetList])
-    Params.yesIceV = np.any([np.any(Planet.phase == 5) for Planet in PlanetList])
-    Params.yesIceVI = np.any([np.any(abs(Planet.phase) == 6) for Planet in PlanetList])
-    Params.yesWetHPs = np.any([np.any(Planet.phase == 5) or np.any(Planet.phase == 6) for Planet in PlanetList])
+    # Only models that actually ran have a phase array; a grid cell that failed (e.g. a
+    # degenerate profile marked invalid) leaves Planet.phase as None, so skip those here.
+    _withPhase = [Planet for Planet in PlanetList if getattr(Planet, 'phase', None) is not None]
+    Params.yesClath = np.any([np.any(np.logical_and(Planet.phase >= Constants.phaseClath, Planet.phase < Constants.phaseClath + 10)) for Planet in _withPhase])
+    Params.yesIceII = np.any([np.any(Planet.phase == 2) for Planet in _withPhase])
+    Params.yesIceIIIund = np.any([np.any(Planet.phase == -3) for Planet in _withPhase])
+    Params.yesIceIII = np.any([np.any(Planet.phase == 3) for Planet in _withPhase])
+    Params.yesIceVund = np.any([np.any(Planet.phase == -5) for Planet in _withPhase])
+    Params.yesIceV = np.any([np.any(Planet.phase == 5) for Planet in _withPhase])
+    Params.yesIceVI = np.any([np.any(abs(Planet.phase) == 6) for Planet in _withPhase])
+    Params.yesWetHPs = np.any([np.any(Planet.phase == 5) or np.any(Planet.phase == 6) for Planet in _withPhase])
     Params.yesInduction = np.any([Planet.Magnetic.Binm_nT is not None for Planet in PlanetList])
 
     for Planet in PlanetList:

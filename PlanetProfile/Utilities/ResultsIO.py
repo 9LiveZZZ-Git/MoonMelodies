@@ -97,6 +97,24 @@ def ExtractResults(Results, PlanetGrid, Params):
     return Results
 
 
+def _sumOrNan(a, b):
+    """ Sum two possibly-None scalars (a failed grid cell leaves derived lengths as None),
+        treating None as NaN so an invalid cell can't abort the whole grid extraction. """
+    a = np.nan if a is None else a
+    b = np.nan if b is None else b
+    return a + b
+
+
+def _lastOrNan(v):
+    """ Last element of an array-or-scalar field, NaN if None/empty. Ionosphere bounds are
+        a scalar on some bodies and an array on others; a failed cell leaves them at the
+        scalar default, so subscripting [-1] blindly would crash the whole grid. """
+    if v is None:
+        return np.nan
+    a = np.atleast_1d(v)
+    return a[-1] if a.size else np.nan
+
+
 def ExtractBasePlanetData(baseStruct, PlanetGrid):
     """
     Extract common base data from Planet objects.
@@ -129,7 +147,7 @@ def ExtractBasePlanetData(baseStruct, PlanetGrid):
         
         # Body structure  
         'R_m': np.array([[Planeti.Bulk.R_m for Planeti in line] for line in PlanetGrid]),
-        'zSeafloor_km': np.array([[getattr(Planeti, 'D_km', 0) + getattr(Planeti, 'zb_km', 0) for Planeti in line] for line in PlanetGrid]),
+        'zSeafloor_km': np.array([[_sumOrNan(getattr(Planeti, 'D_km', np.nan), getattr(Planeti, 'zb_km', np.nan)) for Planeti in line] for line in PlanetGrid]),
         'dzIceI_km': np.array([[getattr(Planeti, 'dzIceI_km', np.nan) for Planeti in line] for line in PlanetGrid]),
         'dzClath_km': np.array([[getattr(Planeti, 'dzClath_km', np.nan) for Planeti in line] for line in PlanetGrid]),
         'dzIceIII_km': np.array([[getattr(Planeti, 'dzIceIII_km', np.nan) for Planeti in line] for line in PlanetGrid]),
@@ -188,8 +206,8 @@ def ExtractBasePlanetData(baseStruct, PlanetGrid):
         'icePhi_frac': np.array([[Planeti.Ocean.phiMax_frac.get('Ih', np.nan) if hasattr(Planeti.Ocean, 'phiMax_frac') and Planeti.Ocean.phiMax_frac else np.nan for Planeti in line] for line in PlanetGrid]),
         'silPclosure_MPa': np.array([[getattr(Planeti.Sil, 'Pclosure_MPa', np.nan) for Planeti in line] for line in PlanetGrid]),
         'icePclosure_MPa': np.array([[Planeti.Ocean.Pclosure_MPa.get('Ih', np.nan) if hasattr(Planeti.Ocean, 'Pclosure_MPa') and Planeti.Ocean.Pclosure_MPa else np.nan for Planeti in line] for line in PlanetGrid]),
-        'ionosTop_km': np.array([[Planeti.Magnetic.ionosBounds_m[-1] / 1e3 if hasattr(Planeti, 'Magnetic') and hasattr(Planeti.Magnetic, 'ionosBounds_m') and Planeti.Magnetic.ionosBounds_m is not None else np.nan for Planeti in line] for line in PlanetGrid]),
-        'sigmaIonos_Sm': np.array([[Planeti.Magnetic.sigmaIonosPedersen_Sm[-1] if hasattr(Planeti, 'Magnetic') and hasattr(Planeti.Magnetic, 'sigmaIonosPedersen_Sm') and Planeti.Magnetic.sigmaIonosPedersen_Sm is not None else np.nan for Planeti in line] for line in PlanetGrid]),
+        'ionosTop_km': np.array([[_lastOrNan(getattr(getattr(Planeti, 'Magnetic', None), 'ionosBounds_m', None)) / 1e3 for Planeti in line] for line in PlanetGrid]),
+        'sigmaIonos_Sm': np.array([[_lastOrNan(getattr(getattr(Planeti, 'Magnetic', None), 'sigmaIonosPedersen_Sm', None)) for Planeti in line] for line in PlanetGrid]),
         'Htidal_Wm3': np.array([[getattr(Planeti.Sil, 'Htidal_Wm3', np.nan) for Planeti in line] for line in PlanetGrid]),
         'Qrad_Wkg': np.array([[getattr(Planeti.Sil, 'Qrad_Wkg', np.nan) for Planeti in line] for line in PlanetGrid]),
         
