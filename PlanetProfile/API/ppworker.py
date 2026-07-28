@@ -48,7 +48,7 @@ def _run_single(spec, jobdir, jobid, engine, pristineParams, emit):
     emit({'type': 'progress', 'id': jobid, 'stage': 'write', 'percent': 95})
 
     manifest = resultsmod.build_manifest(jobdir)
-    result = resultsmod.extract_single(Planet, manifest=manifest)
+    result = resultsmod.extract_single(Planet, manifest=manifest, Params=Params)
     resultsmod.write_result_json(result, jobdir)
 
     return {'type': 'result', 'id': jobid,

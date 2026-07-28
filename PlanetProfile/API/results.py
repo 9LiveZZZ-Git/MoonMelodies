@@ -130,7 +130,37 @@ def _array(Planet, path, n):
     return to_jsonable(np.asarray(arr))
 
 
-def extract_single(Planet, manifest=None, figures=None):
+def _species_phases(Planet, Params):
+    """ Per-species aggregate-state tags ('aqueous'/'solid'/'gas') for the hydrosphere
+        species chart's aqueous/solid panel split. Mirrors PTPlots.PlotHydrosphereSpecies,
+        which queries the SupCRT database for each species' aggregateState. Only meaningful
+        for CustomSolution comps (Seawater/MgSO4 return all-aqueous); returns None otherwise
+        or if reaktoro / the database is unavailable, so the frontend degrades gracefully. """
+    comp = str(getattr(Planet.Ocean, 'comp', '') or '')
+    species = getattr(Planet.Ocean, 'aqueousSpecies', None)
+    if 'CustomSolution' not in comp or species is None or Params is None:
+        return None
+    dbName = getattr(getattr(Params, 'CustomSolution', None), 'SUPCRT_DATABASE', None)
+    if not dbName:
+        return None
+    try:
+        import reaktoro as rkt
+        db = rkt.SupcrtDatabase(dbName)
+        def tag(s):
+            st = db.species(s).aggregateState()
+            if st == rkt.AggregateState.Aqueous:
+                return 'aqueous'
+            if st == rkt.AggregateState.Solid:
+                return 'solid'
+            if st == rkt.AggregateState.Gas:
+                return 'gas'
+            return str(st).split('.')[-1].lower()
+        return [tag(s) for s in species]
+    except Exception:
+        return None
+
+
+def extract_single(Planet, manifest=None, figures=None, Params=None):
     """ Build the single-run result dict (spec section 3.2) from a completed Planet. """
     valid = bool(getattr(Planet.Do, 'VALID', False))
     nTotal = int(getattr(Planet.Steps, 'nTotal', 0) or 0)
@@ -151,6 +181,21 @@ def extract_single(Planet, manifest=None, figures=None):
                       for c in ('x', 'y', 'z')},
     }
 
+    # Discrete excitation-field amplitudes |Be| per component, derived from the excitation
+    # moments with the same helper the engine uses for the induced response. Guard skips the
+    # per-spacecraft-era dict form (trajectory runs) and the None case (Do.VALID False).
+    Benm = getattr(Mag, 'Benm_nT', None)
+    if Benm is not None and not isinstance(Benm, dict):
+        try:
+            from PlanetProfile.MagneticInduction.MagneticInduction import Benm2absBexyz
+            Bex, Bey, Bez = Benm2absBexyz(Benm)
+            induction['Be1xyz_nT'] = {'x': to_jsonable(Bex), 'y': to_jsonable(Bey),
+                                      'z': to_jsonable(Bez)}
+        except Exception:
+            induction['Be1xyz_nT'] = {'x': None, 'y': None, 'z': None}
+    else:
+        induction['Be1xyz_nT'] = {'x': None, 'y': None, 'z': None}
+
     layers = {name: _array(Planet, path, nTotal) for name, path in _LAYER_ARRAYS.items()}
 
     trade = {
@@ -162,6 +207,13 @@ def extract_single(Planet, manifest=None, figures=None):
     ocean = {
         'aqueousSpecies': to_jsonable(getattr(Planet.Ocean, 'aqueousSpecies', None)),
         'aqueousSpeciesAmount_mol': to_jsonable(getattr(Planet.Ocean, 'aqueousSpeciesAmount_mol', None)),
+        # Aggregate-state tag per species (aqueous/solid/gas) for the engine's panel split.
+        # Computed from the SupCRT database for CustomSolution comps; null otherwise so the
+        # frontend plots all species in one class.
+        'aqueousSpeciesPhase': to_jsonable(_species_phases(Planet, Params)),
+        # Per-liquid-layer pH array (aligns 1:1 with the phase==0 ocean layers used by the
+        # species chart); enables the full pH-vs-depth curve, not just the two endpoints.
+        'Bulk_pHs': to_jsonable(getattr(Planet.Ocean, 'Bulk_pHs', None)),
         'pHSeafloor': to_jsonable(getattr(Planet.Ocean, 'pHSeafloor', None)),
         'pHTop': to_jsonable(getattr(Planet.Ocean, 'pHTop', None)),
     }
@@ -193,7 +245,12 @@ _GRID_FIELDS = [
     'rhoOceanMean_kgm3', 'rhoSilMean_kgm3', 'rhoCoreMean_kgm3', 'Rcore_km',
     'zSeafloor_km', 'eLid_km', 'Pseafloor_MPa', 'phiSeafloor_frac',
     'kLoveAmp', 'hLoveAmp', 'lLoveAmp',
+    'deltaLoveAmp', 'Tb_K', 'zb_approximate_km', 'oceanComp',
 ]
+
+# availableZ entries that are non-numeric (string categories). The client must exclude these
+# from the heatmap color dropdown while still reading them for the scatter projections.
+_GRID_STRING_FIELDS = ['oceanComp']
 
 
 def extract_grid(Exploration, Params, manifest=None):
@@ -232,6 +289,7 @@ def extract_grid(Exploration, Params, manifest=None):
             'xName': Exploration.xName, 'yName': Exploration.yName,
             'zNames': [z for z in zNames if z],
             'availableZ': wanted,
+            'stringZ': [nm for nm in wanted if nm in _GRID_STRING_FIELDS],
             'artifacts': manifest if manifest is not None else [],
         },
         'grid': grid,

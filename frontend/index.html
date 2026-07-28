@@ -187,6 +187,11 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 .heatmeta .mrow:first-child{border-top:1px solid var(--hair)}
 .heatmeta .mk{opacity:.6; text-transform:uppercase; letter-spacing:.08em; font-size:10px; font-family:var(--display); font-weight:600}
 
+/* exploreogram scatter re-projections (D/σ, z_b/D, Love) */
+.exproj{margin-top:30px}
+.projgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:22px 26px}
+.projbox{height:266px}
+
 /* corner plot + summary */
 .cornerwrap{display:grid; grid-template-columns:minmax(0,1fr) 268px; gap:24px; align-items:start}
 @media(max-width:820px){ .cornerwrap{grid-template-columns:1fr} }
@@ -333,6 +338,18 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
         </div>
         <div class="canvasbox heatbox"><canvas id="heatIn" aria-label="InductOgram induction heatmap"></canvas></div>
         <div class="heatmeta" id="inMeta"></div>
+      </div>
+    </div>
+    <!-- ExploreOgram re-projections: same grid data, different axis mappings -->
+    <div class="exproj" id="exProj" hidden>
+      <div class="kick">ExploreOgram projections · re-projections of the swept grid</div>
+      <div class="projgrid">
+        <figure class="fig"><figcaption><span class="ft">Ocean D vs conductivity σ</span><span class="fu">colour z_b</span></figcaption>
+          <div class="canvasbox projbox"><canvas id="scDsigma" aria-label="Ocean thickness versus conductivity scatter"></canvas></div></figure>
+        <figure class="fig"><figcaption><span class="ft">Ice shell z_b vs ocean D</span><span class="fu">colour = selected z</span></figcaption>
+          <div class="canvasbox projbox"><canvas id="scZbD" aria-label="Ice shell thickness versus ocean thickness scatter"></canvas></div></figure>
+        <figure class="fig"><figcaption><span class="ft">Tidal k₂ vs δ₂</span><span class="fu">Love comparison</span></figcaption>
+          <div class="canvasbox projbox"><canvas id="scLove" aria-label="Tidal Love k2 versus delta2 scatter"></canvas></div></figure>
       </div>
     </div>
   </section>
@@ -924,14 +941,446 @@ function drawInduction(cv, model, opts={}){
   }, W, H);
 }
 
+/* ============================================================ BUCKET-1 charts
+   Faithful canvas renderers for the engine's trade-off, ocean-chemistry, complex
+   induction, and porosity plots. Each degrades to an inline wrapped note when the
+   selected body/composition lacks the data — never a blank or broken panel. */
+
+/* word-wrapped centred note filling a figure panel */
+function panelNote(g,W,H,msg){
+  const words=String(msg||'').split(/\s+/), lines=[]; let cur='';
+  g.font='10px '+monoStack();
+  words.forEach(w=>{ const t=cur?cur+' '+w:w;
+    if(g.measureText(t).width>W-26){ if(cur) lines.push(cur); cur=w; } else cur=t; });
+  if(cur) lines.push(cur);
+  const lh=14; let y=H/2-(Math.min(lines.length,5)-1)*lh/2;
+  g.fillStyle=INKa(.5); g.textAlign='center'; g.textBaseline='middle';
+  lines.slice(0,5).forEach(ln=>{ g.fillText(ln,W/2,y); y+=lh; });
+  g.textAlign='left'; g.textBaseline='alphabetic';
+}
+
+/* component / species palettes (red stays reserved for the live registration value) */
+const CMP={x:'#22242A', y:'#6E92A8', z:'#B98A2E'};
+const SPECIES_COLORS=['#22242A','#6E92A8','#B98A2E','#8E6E9A','#4E7A5A','#B25B4A',
+  '#5A6E86','#9A8C77','#C0704A','#3E7E86','#7A5C86','#8A7A3A'];
+
+/* ocean depth (km, increasing downward) for the liquid layers (phase==0), aligned
+   1:1 with oceanProps species/pH arrays (nLiquid == count(phase==0)). */
+function liquidDepths(model){
+  const {r_m,phase}=model.layers, R=model.R_m; const out=[];
+  for(let i=0;i<phase.length;i++) if(phase[i]===0) out.push((R-r_m[i])/1e3);
+  return out;
+}
+
+/* build a log-decade axis (padded like plotXY), ticks are exponents */
+function logAxis(vals, pxSpan){
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  const llo=Math.log10(lo), lhi=Math.log10(hi);
+  let l0=Math.floor(llo), l1=Math.ceil(lhi);
+  if(llo-l0<1e-9) l0-=1;
+  if(l1-lhi<1e-9) l1+=1;
+  if(l1<=l0) l1=l0+1;
+  const t=logTicks(l0,l1);
+  const perDec=pxSpan/Math.max(1e-9,l1-l0);
+  let labelTicks=null;
+  if(l1-l0>6){ const ev=Math.ceil((l1-l0)/6); labelTicks=t.majors.filter(e=>e%ev===0); }
+  return {lo:l0, hi:l1, ticks:t.majors, minors:perDec>=18?t.minors:[], labelTicks,
+          log:true, fmt:e=>'10'+sup(e)};
+}
+/* build a linear axis; forceZero pins the low edge at 0 (padding the high edge only) */
+function linAxis(vals, forceZero){
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(forceZero){ lo=Math.min(0,lo); if(hi===lo) hi=lo+1; hi+=hi>0?(hi-lo)*0.08:1; }
+  else { if(hi===lo){ hi=lo+1; } const m=(hi-lo)*0.06; lo-=m; hi+=m; }
+  const t=linTicks(lo,hi,5);
+  return {lo, hi, ticks:t.majors, minors:t.minors, step:t.step, log:false,
+          fmt:v=>fmtTick(v,t.step)};
+}
+
+/* generic framed x/y panel: linear or log axes, optional inverted (depth) y,
+   optional forced-zero edges, multi-series line/marker, legend or staggered
+   on-line labels. Follows the ctx2d + drawFrame export contract. */
+function panelXY(cv, s, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,240,216);
+  if(s.note){ panelNote(g,W,H,s.note); return; }
+  const pl=s.pl??46, pr=s.pr??10, pt=s.pt??8, pb=30;
+  const fr={x:pl, y:pt, w:W-pl-pr, h:H-pt-pb};
+  const xv=[], yv=[];
+  s.series.forEach(se=>se.pts.forEach(p=>{
+    if(isFinite(p[0])&&(!s.xlog||p[0]>0)) xv.push(p[0]);
+    if(isFinite(p[1])&&(!s.ylog||p[1]>0)) yv.push(p[1]); }));
+  if(!xv.length||!yv.length){ panelNote(g,W,H,s.empty||'no data'); return; }
+  const AX=s.xlog?logAxis(xv,fr.w):linAxis(xv,s.xForceZero);
+  const AY=s.ylog?logAxis(yv,fr.h):linAxis(yv,s.yForceZero);
+  const tx=v=>s.xlog?Math.log10(Math.max(v,1e-300)):v;
+  const ty=v=>s.ylog?Math.log10(Math.max(v,1e-300)):v;
+  const X=v=>fr.x+((tx(v)-AX.lo)/((AX.hi-AX.lo)||1))*fr.w;
+  const Y=v=>{ const f=(ty(v)-AY.lo)/((AY.hi-AY.lo)||1); return s.yInvert?fr.y+f*fr.h:fr.y+fr.h-f*fr.h; };
+  const Xt=e=>fr.x+((e-AX.lo)/((AX.hi-AX.lo)||1))*fr.w;
+  const Yt=e=>{ const f=(e-AY.lo)/((AY.hi-AY.lo)||1); return s.yInvert?fr.y+f*fr.h:fr.y+fr.h-f*fr.h; };
+  g.save(); g.beginPath(); g.rect(fr.x,fr.y,fr.w,fr.h); g.clip();
+  s.series.forEach(se=>{
+    const ok=p=>isFinite(p[0])&&isFinite(p[1])&&(!s.xlog||p[0]>0)&&(!s.ylog||p[1]>0);
+    if(se.line){ g.beginPath(); let started=false;
+      se.pts.forEach(p=>{ if(!ok(p)){started=false;return;}
+        const px=X(p[0]),py=Y(p[1]); started?g.lineTo(px,py):g.moveTo(px,py); started=true; });
+      g.strokeStyle=se.color||INK; g.lineWidth=se.w||1.5; g.stroke(); }
+    if(se.marker){ g.fillStyle=se.color||INK;
+      se.pts.forEach(p=>{ if(!ok(p))return; const px=X(p[0]),py=Y(p[1]);
+        g.beginPath(); g.arc(px,py,se.mw||2.4,0,2*Math.PI); g.fill(); }); }
+  });
+  g.restore();
+  drawFrame(g, fr, {
+    x:{ticks:AX.ticks, minors:AX.minors, labelTicks:AX.labelTicks, pos:Xt, label:s.xlabel, fmt:AX.fmt},
+    y:{ticks:AY.ticks, minors:AY.minors, labelTicks:AY.labelTicks, pos:Yt, label:s.ylabel, fmt:AY.fmt},
+  }, W, H);
+  // multi-series legend, top-right inside the frame
+  if(s.legend && s.series.length>1){
+    g.font='8.5px '+monoStack(); g.textBaseline='middle';
+    const items=s.series.map(se=>({c:se.color||INK, t:se.label||''}));
+    const tw=items.reduce((a,it)=>a+13+g.measureText(it.t).width+9,0);
+    let lx=fr.x+fr.w-4-tw; const ly=fr.y+9;
+    items.forEach(it=>{ g.fillStyle=it.c; g.fillRect(lx,ly-1.2,10,2.5);
+      g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(it.t,lx+13,ly);
+      lx+=13+g.measureText(it.t).width+9; });
+    g.textBaseline='alphabetic';
+  }
+  // staggered on-line labels (species): one per series, distributed down the panel
+  if(s.stagger){
+    const n=s.series.length;
+    g.font='8px '+monoStack(); g.textBaseline='middle';
+    s.series.forEach((se,k)=>{
+      const pts=se.pts.filter(p=>isFinite(p[0])&&isFinite(p[1])&&(!s.xlog||p[0]>0));
+      if(!pts.length) return;
+      const mx=pts[Math.floor(pts.length/2)][0];
+      const px=X(mx), py=fr.y+((k+0.5)/n)*fr.h;
+      const tw=g.measureText(se.label||'').width;
+      let tx=px+6, alignL=true; if(px+6+tw>fr.x+fr.w-2){ tx=px-6; alignL=false; }
+      g.textAlign=alignL?'left':'right';
+      g.lineWidth=3; g.strokeStyle=opts.export?'#FFFFFF':'#FCFCFB';
+      g.strokeText(se.label||'',tx,py);
+      g.fillStyle=se.color||INK; g.fillText(se.label||'',tx,py);
+    });
+    g.textAlign='left'; g.textBaseline='alphabetic';
+  }
+  // small footnote inside the frame, bottom-left
+  if(s.footnote){ g.fillStyle=INKa(.55); g.font='8px '+monoStack();
+    g.textAlign='left'; g.fillText(s.footnote, fr.x+5, fr.y+fr.h-5); }
+}
+
+/* (a) Silicate outer radius vs rock density trade-off (PlotSilTradeoff) */
+function drawSilTradeoff(cv, model, opts={}){
+  const T=model.trade;
+  if(!T||!T.RsilTrade_m||T.RsilTrade_m.length<2)
+    return panelXY(cv,{note:'no silicate trade-off computed for this model'},opts);
+  const pts=T.RsilTrade_m.map((r,i)=>[r/1e3, T.rhoSilTrade_kgm3[i]]);
+  panelXY(cv,{ xlabel:'R_sil (km)', ylabel:'ρ_rock (kg m⁻³)',
+    series:[{pts, color:INK, line:true, marker:true, mw:1.8}] }, opts);
+}
+/* (a) Core radius vs silicate radius trade-off (PlotCoreTradeoff), gated on Fe core */
+function drawCoreTradeoff(cv, model, opts={}){
+  const T=model.trade;
+  if(!T||!T.RsilTrade_m||T.RsilTrade_m.length<2)
+    return panelXY(cv,{note:'no core trade-off computed for this model'},opts);
+  const maxCore=Math.max(...T.RcoreTrade_m.map(v=>Math.abs(v)||0));
+  if(maxCore<1)
+    return panelXY(cv,{note:'no metallic core in this model (porosity-supported interior)'},opts);
+  const pts=T.RsilTrade_m.map((r,i)=>[r/1e3, T.RcoreTrade_m[i]/1e3]);
+  panelXY(cv,{ xlabel:'R_sil (km)', ylabel:'R_core (km)',
+    series:[{pts, color:INK, line:true, marker:true, mw:1.8}] }, opts);
+}
+/* (b) Ocean aqueous speciation vs depth (PTPlots.PlotHydrosphereSpecies, aqueous panel) */
+const AQ_THRESHOLD=1e-6;   // engine FigMisc.minAqueousThreshold analogue
+function drawOceanSpecies(cv, model, opts={}){
+  const op=model.oceanProps;
+  const dep=op?liquidDepths(model):[];
+  if(!op||!op.aqueousSpecies||!op.aqueousSpecies.length||!dep.length)
+    return panelXY(cv,{note:'no ocean speciation for this model'},opts);
+  const names=op.aqueousSpecies, amt=op.aqueousSpeciesAmount_mol, ph=op.aqueousSpeciesPhase;
+  const series=[]; let ci=0;
+  names.forEach((nm,si)=>{
+    if(/H2O\(aq\)/i.test(nm)) return;                 // solvent excluded (engine convention)
+    if(ph && ph[si]==='solid') return;                // solids on a separate panel; skip here
+    const row=amt[si]; if(!row) return;
+    const mx=Math.max(...row.map(v=>isFinite(v)?v:0));
+    if(!(mx>=AQ_THRESHOLD)) return;                    // below threshold: omit
+    const pts=row.map((v,k)=>[Math.max(v,AQ_THRESHOLD), dep[k]]);
+    series.push({pts, color:SPECIES_COLORS[ci%SPECIES_COLORS.length], line:true, w:1.4,
+                 label:nm.replace(/:$/,'')}); ci++;
+  });
+  if(!series.length)
+    return panelXY(cv,{note:'no aqueous species above threshold for this model'},opts);
+  panelXY(cv,{ xlog:true, yInvert:true, pl:50,
+    xlabel:'Aqueous species (mol kg⁻¹)', ylabel:'Depth z (km)',
+    series, stagger:true }, opts);
+}
+/* (b) Ocean pH vs depth (pH sub-axis of PlotHydrosphereSpecies) */
+function drawOceanPH(cv, model, opts={}){
+  const op=model.oceanProps; const dep=op?liquidDepths(model):[];
+  if(!op) return panelXY(cv,{note:'pH not computed for this ocean composition'},opts);
+  let pts=null;
+  if(Array.isArray(op.Bulk_pHs) && op.Bulk_pHs.length && dep.length)
+    pts=op.Bulk_pHs.map((v,k)=>[v, dep[k]]).filter(p=>Number.isFinite(p[0]));
+  else if(op.pHTop!=null && op.pHSeafloor!=null && dep.length)
+    pts=[[op.pHTop, dep[0]],[op.pHSeafloor, dep[dep.length-1]]];
+  if(!pts||!pts.length)
+    return panelXY(cv,{note:'pH not computed for this ocean composition'},opts);
+  panelXY(cv,{ yInvert:true, xlabel:'pH', ylabel:'Depth z (km)',
+    series:[{pts, color:'#6E92A8', line:true, marker:pts.length<=2, mw:2.6, w:1.6}] }, opts);
+}
+/* (c) Induced-dipole complex plane, Re vs Im, all three components (PlotComplexBdip) */
+function drawInductComplex(cv, model, opts={}){
+  const I=model.induct, bi=I&&I.Bi1xyz_nT;
+  if(!I||!bi||!Array.isArray(bi.x)||!bi.x.length)
+    return panelXY(cv,{note:'no induction response computed for this model'},opts);
+  const series=['x','y','z'].map(c=>({
+    pts:(bi[c]||[]).map(v=>[v.re, v.im]), color:CMP[c], marker:true, mw:3, label:'Bⁱ_'+c }));
+  panelXY(cv,{ xForceZero:true, yForceZero:true, pl:46,
+    xlabel:'Re{Bⁱ_c} (nT)', ylabel:'Im{Bⁱ_c} (nT)',
+    series, legend:true }, opts);
+}
+/* (c) Induced-dipole component amplitudes |Bⁱ_c| vs excitation period (PlotMagSpectrumInduced) */
+function drawInductDipole(cv, model, opts={}){
+  const I=model.induct, bi=I&&I.Bi1xyz_nT, per=I&&I.Texc_hr;
+  if(!I||!bi||!Array.isArray(bi.x)||!bi.x.length||!Array.isArray(per)||!per.length)
+    return panelXY(cv,{note:'no induction response computed for this model'},opts);
+  const series=['x','y','z'].map(c=>({
+    pts:(bi[c]||[]).map((v,i)=>[per[i], Math.hypot(v.re,v.im)]),
+    color:CMP[c], marker:true, mw:2.8, label:'|Bⁱ_'+c+'|' }));
+  panelXY(cv,{ xlog:true, ylog:true, pl:48,
+    xlabel:'T_exc (hr)', ylabel:'|Bⁱ_c| (nT)',
+    series, legend:true }, opts);
+}
+/* ---- magnetic excitation spectra (BUCKET-2) -------------------------------
+   Discrete-excitation analogues of MagPlots.PlotMagSpectrum / PlotMagSpectrumInduced:
+   stem + marker per excitation on a log period (hr) × log field (nT) frame. One
+   drives the response (|Bₑ| per component, top panel of PlotMagSpectrumInduced /
+   PlotMagSpectrum), the other is the induced dipole modulus |Bᵢ| (bottom panel).
+   Same stem grammar as drawInduction; dominant peak accented + annotated. */
+function stemSpectrum(cv, o, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,360,216);
+  if(o.note){ panelNote(g,W,H,o.note); return; }
+  const per=o.per||[], series=o.series||[];
+  const yv=[]; series.forEach(s=>s.vals.forEach(v=>{ if(isFinite(v)&&v>0) yv.push(v); }));
+  if(!per.length||!yv.length){ panelNote(g,W,H,o.empty||'no excitation spectrum for this model'); return; }
+  const pl=48,pr=10,pt=8,pb=30;
+  const fr={x:pl, y:pt, w:W-pl-pr, h:H-pt-pb};
+  const lx=Math.log10(Math.min(...per)*0.8), hx=Math.log10(Math.max(...per)*1.3);
+  const X=p=>fr.x+(Math.log10(p)-lx)/((hx-lx)||1)*fr.w;
+  const Xe=e=>fr.x+(e-lx)/((hx-lx)||1)*fr.w;
+  const AY=logAxis(yv, fr.h);
+  const Y=v=>fr.y+fr.h-((Math.log10(Math.max(v,1e-300))-AY.lo)/((AY.hi-AY.lo)||1))*fr.h;
+  const Yt=e=>fr.y+fr.h-((e-AY.lo)/((AY.hi-AY.lo)||1))*fr.h;
+  const base=fr.y+fr.h-1;
+  // global peak (dominant excitation) across all component series → accent
+  let pk={si:-1,i:-1,v:-Infinity,per:null};
+  series.forEach((s,si)=>s.vals.forEach((v,i)=>{ if(isFinite(v)&&v>0&&v>pk.v) pk={si,i,v,per:per[i]}; }));
+  g.save(); g.beginPath(); g.rect(fr.x,fr.y-4,fr.w,fr.h+5); g.clip();
+  series.forEach((s,si)=>{ s.vals.forEach((v,i)=>{ if(!isFinite(v)||v<=0) return;
+    const x=X(per[i]), y=Y(v), isPk=o.markPeak&&si===pk.si&&i===pk.i;
+    g.strokeStyle=isPk?'#6E92A8':hexA(s.color||INK,.72); g.lineWidth=isPk?2:1.3;
+    g.beginPath(); g.moveTo(x,base); g.lineTo(x,y); g.stroke();
+    g.fillStyle=isPk?'#6E92A8':(s.color||INK);
+    g.beginPath(); g.arc(x,y,isPk?3.1:2.4,0,2*Math.PI); g.fill(); }); });
+  g.restore();
+  const xt=logTicks(lx,hx);
+  drawFrame(g, fr, {
+    x:{ticks:xt.majors, minors:(fr.w/((hx-lx)||1)>=18)?xt.minors:[], pos:Xe, label:'T_exc (hr)', fmt:e=>'10'+sup(e)},
+    y:{ticks:AY.ticks, minors:AY.minors, labelTicks:AY.labelTicks, pos:Yt, label:o.ylabel||'', fmt:AY.fmt},
+  }, W, H);
+  // component legend, top-right inside the frame
+  if(o.legend && series.length>1){
+    g.font='8.5px '+monoStack(); g.textBaseline='middle';
+    const items=series.map(s=>({c:s.color||INK, t:s.label||''}));
+    const tw=items.reduce((a,it)=>a+13+g.measureText(it.t).width+9,0);
+    let lgx=fr.x+fr.w-4-tw; const ly=fr.y+9;
+    items.forEach(it=>{ g.fillStyle=it.c; g.fillRect(lgx,ly-1.2,10,2.5);
+      g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(it.t,lgx+13,ly);
+      lgx+=13+g.measureText(it.t).width+9; });
+    g.textBaseline='alphabetic';
+  }
+  // dominant-peak annotation: period + peak magnitude (MARK_BEXC_MAX convention)
+  if(o.markPeak && pk.i>=0){
+    const x=X(pk.per), y=Y(pk.v);
+    const l1='T '+fmtTick(pk.per)+' hr', l2='|B| '+fmtTick(pk.v)+' nT';
+    g.font='8px '+monoStack();
+    const wtxt=Math.max(g.measureText(l1).width,g.measureText(l2).width);
+    let tx=x+7, alignL=true; if(tx+wtxt>fr.x+fr.w-3){ tx=x-7; alignL=false; }
+    // near the top edge (where a multi-series legend sits) drop the label below the
+    // marker so it never collides with the component legend
+    const ty=(y<fr.y+34)?y+13:Math.max(fr.y+16, y-4);
+    g.textAlign=alignL?'left':'right';
+    g.lineWidth=3; g.strokeStyle=opts.export?'#FFFFFF':'#FCFCFB';
+    g.strokeText(l1,tx,ty); g.strokeText(l2,tx,ty+9);
+    g.fillStyle='#6E92A8'; g.fillText(l1,tx,ty);
+    g.fillStyle=INKa(.6); g.fillText(l2,tx,ty+9);
+    g.textAlign='left';
+  }
+}
+/* (c) Excitation-field |Bₑ| spectrum — per-component x/y/z stems (PlotMagSpectrum, top panel) */
+function drawSpectrumBe(cv, model, opts={}){
+  const I=model.induct, be=I&&I.Be1xyz_nT, per=I&&I.Texc_hr;
+  if(!I) return stemSpectrum(cv,{note:'no induction response computed for this model'},opts);
+  if(!be||!Array.isArray(be.x)||!be.x.length||!Array.isArray(per)||!per.length)
+    return stemSpectrum(cv,{note:'excitation moments were not stored for this run'},opts);
+  const series=['x','y','z'].map(c=>({vals:be[c]||[], color:CMP[c], label:'|Bᵉ_'+c+'|'}));
+  stemSpectrum(cv,{ per, series, legend:true, markPeak:true, ylabel:'|Bᵉ_c| (nT)' }, opts);
+}
+/* (c) Induced-dipole modulus |Bᵢ| spectrum — √(|Bix|²+|Biy|²+|Biz|²) stems (PlotMagSpectrumInduced, bottom panel) */
+function drawSpectrumBi(cv, model, opts={}){
+  const I=model.induct, bi=I&&I.Bi1xyz_nT, per=I&&I.Texc_hr;
+  if(!I) return stemSpectrum(cv,{note:'no induction response computed for this model'},opts);
+  if(!bi||!Array.isArray(bi.x)||!bi.x.length||!Array.isArray(per)||!per.length)
+    return stemSpectrum(cv,{note:'no induced dipole spectrum for this model'},opts);
+  const cmod=(a,i)=>{ const v=a&&a[i]; return v?Math.hypot(v.re||0,v.im||0):0; };
+  const mod=per.map((_,i)=>Math.hypot(cmod(bi.x,i),cmod(bi.y,i),cmod(bi.z,i)));
+  stemSpectrum(cv,{ per, series:[{vals:mod, color:INK, label:'|Bᵢ|'}], markPeak:true, ylabel:'|Bᵢ| (nT)' }, opts);
+}
+
+/* ---- exploreogram scatter re-projections (BUCKET-2) -----------------------
+   Re-projections of the ExploreOgram grid onto axis pairs the heatmap can't show
+   (ExplorationPlots.PlotExploreOgramDsigma / PlotExploreOgramZbD /
+   PlotExploreOgramLoveComparison). One cell → one point; colour maps a third
+   grid field on the shared sequential ramp with an in-canvas colorbar. Invalid
+   cells with a placeable x,y but a NaN colour are drawn as hollow markers rather
+   than dropped (engine ZBD_NAN convention). */
+// NB Number.isFinite, not the global isFinite: isFinite(null)===true (null→0) would
+// treat all-null grid fields (uncomputed Love numbers, invalid cells) as populated.
+function anyFinite2d(A){ if(!Array.isArray(A)) return false;
+  for(const row of A){ if(Array.isArray(row)){ for(const v of row) if(Number.isFinite(v)) return true; } else if(Number.isFinite(row)) return true; }
+  return false; }
+function scLogFixed(loV,hiV){ const lo=Math.log10(loV), hi=Math.log10(hiV); const t=logTicks(lo,hi);
+  return {lo, hi, ticks:t.majors, minors:t.minors, labelTicks:null, log:true, fmt:e=>'10'+sup(e)}; }
+function drawExploreScatter(cv, state, cfg, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,320,266);
+  if(!state){ note(g,W,H,'generate the report'); return; }
+  const grid=state.grid, nx=state.meta.nx, ny=state.meta.ny;
+  const XA=grid[cfg.xField], YA=grid[cfg.yField], CA=cfg.colorField?grid[cfg.colorField]:null;
+  const at=(A,i,j)=>A&&A[i]?A[i][j]:null;
+  if(!XA||!YA||!anyFinite2d(XA)||!anyFinite2d(YA))
+    return heatNote(cv, cfg.title||'', cfg.missing||'not available for this sweep', opts);
+  const pts=[]; let cLo=Infinity,cHi=-Infinity, anyXY=false, anyColor=false;
+  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
+    const x=at(XA,i,j), y=at(YA,i,j), c=CA?at(CA,i,j):null;
+    const okXY=Number.isFinite(x)&&Number.isFinite(y)&&(!cfg.xlog||x>0)&&(!cfg.ylog||y>0);
+    if(okXY){ anyXY=true; if(Number.isFinite(c)){ anyColor=true; if(c<cLo)cLo=c; if(c>cHi)cHi=c; } }
+    pts.push({x,y,c,okXY});
+  }
+  if(!anyXY) return heatNote(cv, cfg.title||'', cfg.empty||'no converged models in this sweep', opts);
+  const hasCB = !!cfg.colorField && anyColor;
+  const pl=54, pr=hasCB?58:14, pt=12, pb=34;
+  const fr={x:pl, y:pt, w:W-pl-pr, h:H-pt-pb};
+  const xvals=pts.filter(p=>p.okXY).map(p=>p.x), yvals=pts.filter(p=>p.okXY).map(p=>p.y);
+  const AX = cfg.xlog ? (cfg.xFixed?scLogFixed(cfg.xFixed[0],cfg.xFixed[1]):logAxis(xvals,fr.w)) : linAxis(xvals, cfg.xForceZero);
+  const AY = cfg.ylog ? (cfg.yFixed?scLogFixed(cfg.yFixed[0],cfg.yFixed[1]):logAxis(yvals,fr.h)) : linAxis(yvals, cfg.yForceZero);
+  const tx=v=>cfg.xlog?Math.log10(Math.max(v,1e-300)):v, ty=v=>cfg.ylog?Math.log10(Math.max(v,1e-300)):v;
+  const X=v=>fr.x+((tx(v)-AX.lo)/((AX.hi-AX.lo)||1))*fr.w;
+  const Y=v=>fr.y+fr.h-((ty(v)-AY.lo)/((AY.hi-AY.lo)||1))*fr.h;
+  const Xt=e=>fr.x+((e-AX.lo)/((AX.hi-AX.lo)||1))*fr.w;
+  const Yt=e=>fr.y+fr.h-((e-AY.lo)/((AY.hi-AY.lo)||1))*fr.h;
+  g.save(); g.beginPath(); g.rect(fr.x,fr.y,fr.w,fr.h); g.clip();
+  pts.forEach(p=>{ if(!p.okXY) return; const x=X(p.x), y=Y(p.y);
+    if(cfg.colorField && !Number.isFinite(p.c)){             // NaN colour → hollow marker (not dropped)
+      g.strokeStyle=INKa(.34); g.lineWidth=1;
+      g.beginPath(); g.moveTo(x-2.4,y-2.4); g.lineTo(x+2.4,y+2.4);
+      g.moveTo(x+2.4,y-2.4); g.lineTo(x-2.4,y+2.4); g.stroke(); return; }
+    g.fillStyle=hasCB?ramp((p.c-cLo)/((cHi-cLo)||1)):'#6E92A8';
+    g.beginPath(); g.arc(x,y,3.2,0,2*Math.PI); g.fill();
+    g.strokeStyle=INKa(.55); g.lineWidth=0.6; g.stroke(); });
+  g.restore();
+  drawFrame(g, fr, {
+    x:{ticks:AX.ticks, minors:AX.minors, labelTicks:AX.labelTicks, pos:Xt, label:cfg.xlabel, fmt:AX.fmt},
+    y:{ticks:AY.ticks, minors:AY.minors, labelTicks:AY.labelTicks, pos:Yt, label:cfg.ylabel, fmt:AY.fmt},
+  }, W, H);
+  if(hasCB){
+    const cbX=fr.x+fr.w+8, cbW=10, span=(cHi-cLo)||1;
+    const grad=g.createLinearGradient(0,fr.y+fr.h,0,fr.y);
+    [0,.25,.5,.75,1].forEach(tv=>grad.addColorStop(tv, ramp(tv)));
+    g.fillStyle=grad; g.fillRect(cbX,fr.y,cbW,fr.h);
+    g.strokeStyle=INKa(.45); g.lineWidth=1; g.strokeRect(cbX+.5,fr.y+.5,cbW-1,fr.h-1);
+    const ct=linTicks(cLo,cHi,4);
+    g.font='8.5px '+monoStack(); g.textBaseline='middle';
+    ct.majors.forEach(v=>{ if(v<cLo-1e-9||v>cHi+1e-9) return; const py=fr.y+fr.h-((v-cLo)/span)*fr.h;
+      g.strokeStyle=INKa(.45); g.beginPath();
+      g.moveTo(cbX+cbW-1,Math.round(py)+.5); g.lineTo(cbX+cbW-4,Math.round(py)+.5); g.stroke();
+      g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(fmtTick(v,ct.step), cbX+cbW+3, py); });
+    g.textBaseline='alphabetic';
+    g.save(); g.translate(W-4, fr.y+fr.h/2); g.rotate(-Math.PI/2);
+    g.fillStyle=INK; g.font='9.5px '+monoStack(); g.textAlign='center'; g.fillText(cfg.clabel||'',0,0); g.restore();
+  }
+}
+/* D vs σ: x=D linear, y=σ̄ log fixed [1e-2,20], colour = ice-shell z_b (PlotExploreOgramDsigma) */
+function drawDsigma(cv, state, opts={}){
+  drawExploreScatter(cv, state, { title:'ocean thickness vs conductivity',
+    xField:'D_km', yField:'sigmaMean_Sm', colorField:'zb_km',
+    xlog:false, ylog:true, yFixed:[1e-2,20], xForceZero:true,
+    xlabel:'D (km)', ylabel:'σ_ocean (S m⁻¹)', clabel:'z_b (km)',
+    missing:'ocean-thickness / conductivity not available for this sweep' }, opts);
+}
+/* z_b vs D: both linear, colour = the selected z field (PlotExploreOgramZbD) */
+function drawZbD(cv, state, opts={}){
+  const zf=($('#exZ')&&$('#exZ').value)||'D_km';
+  drawExploreScatter(cv, state, { title:'ice shell vs ocean thickness',
+    xField:'zb_km', yField:'D_km', colorField:zf,
+    xlog:false, ylog:false,
+    xlabel:'z_b (km)', ylabel:'D (km)', clabel:zLabel(zf)+(zUnit(zf)?' ('+zUnit(zf)+')':''),
+    missing:'ice-shell / ocean thickness not available for this sweep' }, opts);
+}
+/* k₂ vs δ₂: both linear, colour = ice-shell thickness (PlotExploreOgramLoveComparison) */
+function drawLoveComp(cv, state, opts={}){
+  const grid=state?state.grid:{};
+  const colorField=(grid.zb_approximate_km&&anyFinite2d(grid.zb_approximate_km))?'zb_approximate_km':'zb_km';
+  drawExploreScatter(cv, state, { title:'tidal Love k₂ vs δ₂',
+    xField:'deltaLoveAmp', yField:'kLoveAmp', colorField,
+    xlog:false, ylog:false, xForceZero:true,
+    xlabel:'δ₂ (= 1 + k₂ − h₂)', ylabel:'k₂ amplitude', clabel:'z_b (km)',
+    missing:'Love numbers were not calculated for this sweep',
+    empty:'Love numbers were not calculated for this sweep' }, opts);
+}
+/* (d) Pore-fluid pressure vs depth (companion to PlotPorosity) */
+function drawPorePressure(cv, model, opts={}){
+  const L=model.layers, P=L.Ppore_MPa, R=model.R_m;
+  if(!Array.isArray(P)||!P.length)
+    return panelXY(cv,{note:'no pore pressure computed for this model'},opts);
+  if(Math.max(...P.map(v=>Math.abs(v)||0))<1e-3)
+    return panelXY(cv,{note:'rock/ice not porous in this model (pore pressure = 0)'},opts);
+  const pts=P.map((v,i)=>[v, (R-L.r_m[i])/1e3]);
+  panelXY(cv,{ yInvert:true, pl:52, xlabel:'P_pore (MPa)', ylabel:'Depth z (km)',
+    series:[{pts, color:INK, line:true, w:1.6}] }, opts);
+}
+/* (d) Matrix (grain) vs pore-fluid density vs depth (companion to PlotPorosity) */
+function drawMatrixPore(cv, model, opts={}){
+  const L=model.layers, M=L.rhoMatrix_kgm3, Po=L.rhoPore_kgm3, R=model.R_m;
+  if(!Array.isArray(M)||!M.length)
+    return panelXY(cv,{note:'no porous layers in this model'},opts);
+  const mMax=Math.max(...M.map(v=>Math.abs(v)||0));
+  const pMax=Array.isArray(Po)?Math.max(...Po.map(v=>Math.abs(v)||0)):0;
+  if(mMax<1e-3 && pMax<1e-3)
+    return panelXY(cv,{note:'no porous layers in this model'},opts);
+  const dep=i=>(R-L.r_m[i])/1e3;
+  const series=[{pts:M.map((v,i)=>[v,dep(i)]).filter(p=>p[0]>0), color:'#B9AE9E', line:true, w:1.6, label:'matrix'}];
+  if(pMax>=1e-3)
+    series.push({pts:Po.map((v,i)=>[v,dep(i)]).filter(p=>p[0]>0), color:'#6E92A8', line:true, w:1.6, label:'pore fluid'});
+  panelXY(cv,{ yInvert:true, pl:52, xlabel:'ρ (kg m⁻³)', ylabel:'Depth z (km)',
+    series, legend:series.length>1,
+    footnote: pMax<1e-3 ? 'no pore fluid (ρ_pore = 0)' : null }, opts);
+}
+
 /* which figures exist, grouped into sections */
 const SECTIONS=[
  {name:'Structure', id:'structure', charts:[
-   {t:'Density',u:'kg/m³',key:'rho_kgm3'}, {t:'Gravity',u:'m/s²',key:'g_ms2'}, {t:'Pressure',u:'MPa',key:'P_MPa'} ]},
+   {t:'Density',u:'kg/m³',key:'rho_kgm3'}, {t:'Gravity',u:'m/s²',key:'g_ms2'}, {t:'Pressure',u:'MPa',key:'P_MPa'},
+   {t:'Silicate trade-off',u:'R_sil × ρ_rock',has:m=>!!(m.trade&&m.trade.RsilTrade_m),render:drawSilTradeoff},
+   {t:'Core trade-off',u:'R_sil × R_core',has:m=>!!(m.trade&&m.trade.RsilTrade_m),render:drawCoreTradeoff},
+   {t:'Pore pressure',u:'MPa vs depth',has:m=>!!(m.layers.Ppore_MPa),render:drawPorePressure},
+   {t:'Matrix / pore density',u:'kg/m³ vs depth',has:m=>!!(m.layers.rhoMatrix_kgm3),render:drawMatrixPore} ]},
  {name:'Thermodynamics', id:'thermodynamics', charts:[
    {t:'Temperature',u:'K',key:'T_K',color:'#6E92A8'}, {t:'Heat capacity',u:'J/kg/K',key:'Cp_JkgK'},
    {t:'Expansivity',u:'1/K',key:'alpha_pK'}, {t:'Thermal cond.',u:'W/m/K',key:'kTherm_WmK'},
    {t:'Viscosity',u:'Pa·s',key:'eta_Pas',log:true}, {t:'Tidal heating',u:'W/m³',key:'Htidal_Wm3',log:true} ]},
+ {name:'Ocean chemistry', id:'oceanchem', wide:true, charts:[
+   {t:'Aqueous speciation',u:'mol kg⁻¹ vs depth',has:m=>!!(m.oceanProps&&m.oceanProps.aqueousSpecies&&m.oceanProps.aqueousSpecies.length),render:drawOceanSpecies},
+   {t:'Ocean pH',u:'pH vs depth',has:m=>!!(m.oceanProps&&(m.oceanProps.Bulk_pHs||m.oceanProps.pHTop!=null)),render:drawOceanPH} ]},
  {name:'Seismic', id:'seismic', charts:[
    {t:'Sound speeds',u:'km/s',yl:'V (km s⁻¹)',multi:[['VP_kms',INK,'Vp'],['VS_kms','#6E92A8','Vs']]},
    {t:'Attenuation Q_S',u:'',key:'QS',log:true},
@@ -939,9 +1388,15 @@ const SECTIONS=[
  {name:'Electrical', id:'electrical', charts:[
    {t:'Conductivity',u:'S/m',key:'sigma_Sm',log:true}, {t:'Porosity',u:'void frac',key:'phi_frac'} ]},
  {name:'Gravity & tides', id:'gravity', charts:[ {t:'Tidal Love numbers',u:'amplitude',special:'gravity'} ]},
- {name:'Magnetic induction', id:'induction', charts:[ {t:'Induced response Aₑ',u:'|Aₑ| vs period',special:'induction'} ]},
+ {name:'Magnetic induction', id:'induction', charts:[
+   {t:'Induced response Aₑ',u:'|Aₑ| vs period',special:'induction'},
+   {t:'Excitation spectrum |Bₑ|',u:'nT vs period',has:m=>!!m.inductComputed,render:drawSpectrumBe},
+   {t:'Induced spectrum |Bᵢ|',u:'nT vs period',has:m=>!!m.inductComputed,render:drawSpectrumBi},
+   {t:'Complex dipole',u:'Re vs Im (nT)',has:m=>!!m.inductComputed,render:drawInductComplex},
+   {t:'Dipole components',u:'|Bⁱ| vs period',has:m=>!!m.inductComputed,render:drawInductDipole} ]},
 ];
 function hasData(model, c){
+  if(c.has) return !!c.has(model);
   if(c.special==='gravity') return !!model.grav;
   if(c.special==='induction') return !!model.induct;
   if(c.multi) return c.multi.some(m=>model.layers[m[0]] && model.layers[m[0]].some(isFinite));
@@ -952,7 +1407,7 @@ function renderCharts(model){
   SECTIONS.forEach(sec=>{ figRegistry[sec.id]=[]; });
   const jobs=[]; let html='', id=0;
   SECTIONS.forEach(sec=>{ const chs=sec.charts.filter(c=>hasData(model,c)); if(!chs.length) return;
-    html+=`<div class="fsec"><div class="fhead">${sec.name}${exBtnsHTML(sec.id)}</div><div class="fgrid">`;
+    html+=`<div class="fsec"><div class="fhead">${sec.name}${exBtnsHTML(sec.id)}</div><div class="fgrid${sec.wide?' two':''}">`;
     chs.forEach(c=>{ html+=`<figure class="fig"><figcaption><span class="ft">${c.t}</span><span class="fu">${c.u}</span></figcaption>`
       +`<div class="figbox"><canvas data-id="${id}"></canvas></div></figure>`; jobs.push({id,c,secId:sec.id}); id++; });
     html+='</div></div>';
@@ -961,7 +1416,8 @@ function renderCharts(model){
   const r_km=model.layers.r_m.map(v=>v/1000), R_km=model.R_m/1000;
   jobs.forEach(({id,c,secId})=>{ const cv=host.querySelector(`canvas[data-id="${id}"]`); if(!cv) return;
     let draw;
-    if(c.special==='gravity') draw=(cv2,o={})=>drawGravity(cv2,model,o);
+    if(c.render) draw=(cv2,o={})=>c.render(cv2,model,o);
+    else if(c.special==='gravity') draw=(cv2,o={})=>drawGravity(cv2,model,o);
     else if(c.special==='induction') draw=(cv2,o={})=>drawInduction(cv2,model,o);
     else{ const series=c.multi ? c.multi.filter(m=>model.layers[m[0]]).map(m=>({y:model.layers[m[0]],color:m[1],label:m[2]}))
                                : [{y:model.layers[c.key],color:c.color||INK}];
@@ -1142,7 +1598,14 @@ function fromResult(res, name){
   const liveInd=(res.induction&&res.induction.Amp&&res.induction.Amp.length)?res.induction:null;
   return { R_m:R, name, shells:[{ph:0,r:R}], stats:st, layers,
     grav: liveGrav || smp.grav || null,
-    induct: liveInd || smp.induct || null };
+    induct: liveInd || smp.induct || null,
+    // bucket-1 data blocks (live-only; absent → new charts stay hidden in sample mode).
+    // inductComputed reflects whether the engine ran induction at all (even if it
+    // returned no excitations, e.g. Titan) so the complex-plane charts can show a
+    // graceful note rather than silently disappearing on a real run.
+    trade: res.trade || null,
+    oceanProps: res.oceanProps || null,
+    inductComputed: !!res.induction };
 }
 const sci=v=>{ const e=(+v).toExponential(2).split('e'); return e[0]+'e'+(+e[1]); };
 
@@ -1441,8 +1904,18 @@ function repaintGrid(state, cvSel, metaSel, zSel, err){
     `<div class="mrow"><span class="mk">Y · ${m.yName}</span><span>${fmt((state.axes.yData[0]||[])[0])}–${fmt((state.axes.yData[0]||[])[m.ny-1])}</span></div>`+
     (!isInd&&moi.Cmeasured!=null?`<div class="mrow"><span class="mk">C/MR² obs</span><span>${(+moi.Cmeasured).toFixed(3)}±${(+moi.Cupper).toFixed(3)}</span></div>`:'');
 }
-function repaintExplore(){ repaintGrid(exploreState, '#heatEx', '#exMeta', '#exZ', exploreErr); regSweeps(); }
+function repaintExplore(){ repaintGrid(exploreState, '#heatEx', '#exMeta', '#exZ', exploreErr); repaintProjections(); regSweeps(); }
 function repaintInduct(){ repaintGrid(inductState, '#heatIn', '#inMeta', '#inZ', inductErr); regSweeps(); }
+/* ExploreOgram re-projections: shown only for a grid run; degrade per-panel. The
+   z_b/D panel recolours from the shared #exZ 'Color by' selector. */
+function repaintProjections(){
+  const host=$('#exProj'); if(!host) return;
+  host.hidden=!exploreState;
+  if(!exploreState) return;
+  drawDsigma($('#scDsigma'), exploreState);
+  drawZbD($('#scZbD'), exploreState);
+  drawLoveComp($('#scLove'), exploreState);
+}
 
 /* report job: ExploreOgram over salinity × ice-base T (fixed 5 × 5) */
 async function runExplore(spec){
@@ -1462,8 +1935,13 @@ async function runExplore(spec){
     const res=await runToResult(spec);
     if(!res.grid) throw new Error((res.error&&res.error.message)||'no grid returned');
     exploreState=res; exploreErr=null;
-    const avail=res.meta.availableZ||[];
-    fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), avail.includes($('#exZ').value)?$('#exZ').value:'D_km');
+    // heatmap colour selector: exclude non-numeric (stringZ, e.g. oceanComp) and
+    // entirely-null fields (e.g. Love numbers when the sweep didn't compute tides),
+    // which would otherwise select into an empty heatmap.
+    const avail=res.meta.availableZ||[], sz=new Set(res.meta.stringZ||[]);
+    const numAvail=avail.filter(k=>!sz.has(k) && anyFinite2d(res.grid[k]));
+    const pick=numAvail.includes($('#exZ').value)?$('#exZ').value:(numAvail.includes('D_km')?'D_km':numAvail[0]);
+    fillSel('#exZ', numAvail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), pick);
     repaintExplore();
     setSecStatus('#stExplore','done');
   }catch(e){ exploreState=null; exploreErr=e.message||'sweep failed'; repaintExplore(); setSecStatus('#stExplore','error', e.message); }
@@ -1765,7 +2243,10 @@ function exBtnsHTML(sec){
 function regSweeps(){
   figRegistry.sweeps=[];
   if(exploreState){ const z=$('#exZ').value;
-    regFig('sweeps','explore-'+slug(z),460,356,(cv,o={})=>drawHeatmap(cv,exploreState,$('#exZ').value,o)); }
+    regFig('sweeps','explore-'+slug(z),460,356,(cv,o={})=>drawHeatmap(cv,exploreState,$('#exZ').value,o));
+    regFig('sweeps','proj-dsigma',360,300,(cv,o={})=>drawDsigma(cv,exploreState,o));
+    regFig('sweeps','proj-zbd-'+slug($('#exZ').value),360,300,(cv,o={})=>drawZbD(cv,exploreState,o));
+    regFig('sweeps','proj-love',360,300,(cv,o={})=>drawLoveComp(cv,exploreState,o)); }
   if(inductState){ const z=$('#inZ').value;
     regFig('sweeps','induct-'+slug(z),460,356,(cv,o={})=>drawHeatmap(cv,inductState,$('#inZ').value,o)); }
   syncExportButtons();
@@ -1779,6 +2260,7 @@ function secDataReady(sec){
   switch(sec){
     case 'interior': case 'structure': case 'thermodynamics':
     case 'seismic': case 'electrical': return !!current;
+    case 'oceanchem': return !!(current&&current.oceanProps&&current.oceanProps.aqueousSpecies);
     case 'gravity':   return !!(current&&current.grav);
     case 'induction': return !!(current&&current.induct);
     case 'sweeps':    return !!(exploreState||inductState);
@@ -1907,11 +2389,36 @@ function sectionData(secId){
       const sec=SECTIONS.find(x=>x.id===secId);
       keys=(sec?sec.charts.flatMap(c=>c.key?[c.key]:(c.multi||[]).map(mm=>mm[0])):[])
         .filter(k=>m.layers[k]);
+      // structure also owns the porosity radial fields (chart keys are custom renderers)
+      if(secId==='structure')
+        ['Ppore_MPa','rhoMatrix_kgm3','rhoPore_kgm3'].forEach(k=>{ if(m.layers[k]&&!keys.includes(k)) keys.push(k); });
     }
     F('profile','csv',profileCSV(m,keys));
+    // silicate/core MoI trade-off is per-trial (not per-layer): its own CSV
+    if(secId==='structure' && m.trade && m.trade.RsilTrade_m && m.trade.RsilTrade_m.length){
+      const T=m.trade, trows=T.RsilTrade_m.map((r,i)=>[r/1e3,
+        T.rhoSilTrade_kgm3?T.rhoSilTrade_kgm3[i]:null,
+        T.RcoreTrade_m?T.RcoreTrade_m[i]/1e3:null]);
+      F('trade','csv',toCSV(['Rsil_km','rhoSil_kgm3','Rcore_km'],trows));
+    }
     if(secId==='interior')
       F('summary','json',JSON.stringify({summary:lastResults.single?lastResults.single.summary:null,
                                          stats:m.stats||null},null,2));
+  } else if(secId==='oceanchem'){
+    if(!m||!m.oceanProps||!m.oceanProps.aqueousSpecies) return out;
+    const op=m.oceanProps, dep=liquidDepths(m), sp=op.aqueousSpecies, amt=op.aqueousSpeciesAmount_mol||[];
+    // species amounts: one row per liquid layer (depth + pH), one column per species (mol)
+    const header=['depth_km','pH', ...sp];
+    const rows=dep.map((z,k)=>[z, (op.Bulk_pHs&&op.Bulk_pHs[k]!=null)?op.Bulk_pHs[k]:null,
+      ...sp.map((_,si)=>amt[si]?amt[si][k]:null)]);
+    F('species','csv',toCSV(header,rows));
+    // species aggregate-state tags (CustomSolution only; null otherwise)
+    if(op.aqueousSpeciesPhase)
+      F('species_phase','csv',toCSV(['species','aggregate_state'],
+        sp.map((nm,si)=>[nm, op.aqueousSpeciesPhase[si]])));
+    F('oceanchem','json',JSON.stringify({aqueousSpecies:sp,
+      pHTop:op.pHTop, pHSeafloor:op.pHSeafloor,
+      aqueousSpeciesPhase:op.aqueousSpeciesPhase||null},null,2));
   } else if(secId==='gravity'){
     if(!m||!m.grav) return out;
     const G=m.grav, rows=[];
@@ -1928,10 +2435,29 @@ function sectionData(secId){
     F('gravity','json',JSON.stringify(G,null,2));
   } else if(secId==='induction'){
     if(!m||!m.induct) return out;
-    const I=m.induct;
-    const rows=(I.calcedExc||[]).map((lab,i)=>[lab,
-      I.Texc_hr?I.Texc_hr[i]:null, I.Amp?I.Amp[i]:null, I.phase?I.phase[i]:null]);
-    F('induction','csv',toCSV(['excitation','period_hr','amp','phase_deg'],rows));
+    const I=m.induct, bi=I.Bi1xyz_nT||{}, be=I.Be1xyz_nT||{};
+    const hasBi=Array.isArray(bi.x)&&bi.x.length;
+    const hasBe=Array.isArray(be.x)&&be.x.length;
+    const cval=(c,i,f)=>{ const v=bi[c]&&bi[c][i]; return v?(f==='abs'?Math.hypot(v.re,v.im):v[f]):null; };
+    const beV=(c,i)=>{ const v=be[c]&&be[c][i]; return isFinite(v)?v:null; };
+    const biMod=i=>{ const ax=cval('x',i,'abs'),ay=cval('y',i,'abs'),az=cval('z',i,'abs');
+      return (ax==null&&ay==null&&az==null)?null:Math.hypot(ax||0,ay||0,az||0); };
+    const base=['excitation','period_hr','amp','phase_deg'];
+    // discrete excitation-field |Bₑ| spectrum + induced modulus |Bᵢ| (BUCKET-2 spectra)
+    const beC=hasBe?['Be_x_nT','Be_y_nT','Be_z_nT']:[];
+    const cplx=hasBi?['BiRe_x_nT','BiIm_x_nT','BiRe_y_nT','BiIm_y_nT','BiRe_z_nT','BiIm_z_nT',
+      'BiAbs_x_nT','BiAbs_y_nT','BiAbs_z_nT','Bi_mod_nT']:[];
+    const n=Math.max((I.calcedExc||[]).length, hasBi?bi.x.length:0, hasBe?be.x.length:0);
+    const rows=[];
+    for(let i=0;i<n;i++){
+      const r=[(I.calcedExc||[])[i]||null, I.Texc_hr?I.Texc_hr[i]:null,
+        I.Amp?I.Amp[i]:null, I.phase?I.phase[i]:null];
+      if(hasBe) r.push(beV('x',i),beV('y',i),beV('z',i));
+      if(hasBi) r.push(cval('x',i,'re'),cval('x',i,'im'),cval('y',i,'re'),cval('y',i,'im'),
+        cval('z',i,'re'),cval('z',i,'im'),cval('x',i,'abs'),cval('y',i,'abs'),cval('z',i,'abs'),biMod(i));
+      rows.push(r);
+    }
+    F('induction','csv',toCSV([...base,...beC,...cplx],rows));
   } else if(secId==='sweeps'){
     if(exploreState){
       const s=exploreState, meta=s.meta, ax=s.axes, V=s.grid.VALID, IR=s.grid.invalidReason;
@@ -1944,6 +2470,14 @@ function sectionData(secId){
       F('explore_long','csv',toCSV([meta.xName,meta.yName,'field','value','valid','invalid_reason'],rows));
       const zf=$('#exZ').value;
       if(s.grid[zf]) F('explore_'+slug(zf)+'_matrix','csv',matrixCSV(xs,ys,s.grid[zf]));
+      // scatter re-projection fields (D/σ, z_b/D, Love) — one row per cell; skip any
+      // field already carried as the sweep x/y axis so columns aren't duplicated
+      const pf=['D_km','sigmaMean_Sm','zb_km','deltaLoveAmp','kLoveAmp','zb_approximate_km','Tb_K','oceanComp']
+        .filter(f=>s.grid[f] && f!==meta.xName && f!==meta.yName);
+      if(pf.length){ const prows=[];
+        for(let i=0;i<meta.nx;i++)for(let j=0;j<meta.ny;j++)
+          prows.push([xs[i], ys[j], ...pf.map(f=>s.grid[f][i]?s.grid[f][i][j]:null), V&&V[i]?V[i][j]:null]);
+        F('explore_projections','csv',toCSV([meta.xName,meta.yName,...pf,'valid'],prows)); }
     }
     if(inductState){
       const s=inductState, meta=s.meta, ax=s.axes, V=s.grid.VALID;
@@ -1989,7 +2523,7 @@ async function exportSection(secId, kind){
 }
 
 /* ---- global report bundle ---- */
-const SEC_ORDER=['interior','structure','thermodynamics','seismic','electrical',
+const SEC_ORDER=['interior','structure','thermodynamics','oceanchem','seismic','electrical',
                  'gravity','induction','sweeps','inference'];
 function buildManifest(sections){
   return {
