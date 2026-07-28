@@ -34,3 +34,6 @@ PlanetProfile/Test/mcmc_results/
 
 # Bayesian-inference SBI model artifacts (downloaded separately, not committed)
 PlanetProfile/Inference/sbi_artifacts/*.pt
+
+# Local connection reference (contains the session token)
+CONNECT.md

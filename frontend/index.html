@@ -51,6 +51,8 @@ h1#bodyName{margin:0; font:800 clamp(28px,5.4vw,48px)/1 var(--display); letter-s
 /* ---- control band ------------------------------------------------------- */
 .control{display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px 26px; padding:14px 0 4px}
 .cell{display:flex; flex-direction:column; gap:7px}
+.control .cell.act{margin-left:auto}   /* right-align the action group so it fills the band instead of wrapping to a lonely row */
+@media(max-width:720px){ .control .cell.act{margin-left:0} }
 .clab{font:600 10px var(--display); letter-spacing:.14em; text-transform:uppercase; color:var(--ink); opacity:.6}
 select,.con .val input,.card input{font:13px var(--mono); color:var(--ink); background:var(--paper);
   border:1px solid var(--hair2); border-radius:2px; padding:8px 10px; -webkit-appearance:none; appearance:none}
@@ -188,6 +190,9 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 /* corner plot + summary */
 .cornerwrap{display:grid; grid-template-columns:minmax(0,1fr) 268px; gap:24px; align-items:start}
 @media(max-width:820px){ .cornerwrap{grid-template-columns:1fr} }
+/* high-dimensional posteriors (D>8): drop to one full-width column so cells never
+   collapse into an illegible smear; the summary table flows underneath */
+.cornerwrap.wide{grid-template-columns:1fr}
 .cornerbox{aspect-ratio:1/1; width:100%; border:1px solid var(--hair); background:var(--field)}
 .obsform{display:flex; flex-wrap:wrap; gap:10px 16px; padding:2px 0 16px}
 .ofield{display:flex; flex-direction:column; gap:5px}
@@ -273,7 +278,7 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
       <label class="tog"><input type="checkbox" id="core" checked><span class="sw"></span>Fe core</label>
     </div>
 
-    <div class="cell">
+    <div class="cell act">
       <span class="clab">&nbsp;</span>
       <button class="compute" id="run"><span class="rl">Generate report</span><span class="arw" aria-hidden="true">&#9656;</span></button>
       <button class="compute ghost" id="exportAll">Export report</button>
@@ -1018,6 +1023,27 @@ async function buildSpec(){
   return spec;
 }
 
+/* Seed the console (Tb, salinity, ocean comp, Fe core) from a body's own schema
+   defaults so a first-run report uses body-appropriate constraints. Without this
+   the Europa-tuned console values (Tb 268.3 / Seawater / 35.2) are forced onto every
+   body and non-convergent bodies (Enceladus, Callisto) fail to solve. Requires the
+   backend; in sample mode the console keeps its values (sample view doesn't compute). */
+async function seedConsoleFromSchema(body){
+  if(!backend) return;
+  try{
+    const d=await (await api('/schema/'+encodeURIComponent(body))).json();
+    const de=d.defaults||{}, b=de.bulk||{}, o=de.ocean||{}, dd=de.do||{};
+    const setCon=(k,v)=>{ if(v==null||!isFinite(+v)) return; const el=$(`.con .val input[data-k="${k}"]`); if(el) el.value=String(v); };
+    setCon('Tb', b.Tb_K);
+    setCon('w',  o.wOcean_ppt);
+    if(b.zb_approximate_km!=null) setCon('zb', b.zb_approximate_km);
+    if(o.comp){ const sel=$('#ocean');
+      if(![...sel.options].some(op=>op.value===o.comp)) sel.add(new Option(o.comp,o.comp));
+      sel.value=o.comp; }
+    $('#core').checked = !!dd.Fe_CORE;
+  }catch(_){ /* leave console as-is if the schema can't be fetched */ }
+}
+
 /* ------------------------------------------------------------ backend I/O */
 async function api(path, opts={}){
   const h=Object.assign({'Authorization':'Bearer '+backend.token}, opts.headers||{});
@@ -1070,13 +1096,19 @@ async function runSingle(spec){
     // Retry transient engine failures (a flaky pooled worker can fail a spec that
     // succeeds verbatim on resubmission); a genuinely invalid model (valid:false
     // with no error payload) won't change on resubmission, so don't retry those.
+    // Progressive degradation: the induction step (MoonMag asymmetry expansion) is
+    // the most fragile part of a single run and has its own dedicated InductOgram
+    // section, so on an engine error we drop calcInduction and retry — a valid
+    // interior/gravity model still renders (fromResult falls back to sample induction).
+    let workSpec=cloneSpec(spec);
     for(let attempt=0; attempt<3; attempt++){
       if(attempt) showRail();
-      res=await runToResult(cloneSpec(spec), true);
+      res=await runToResult(cloneSpec(workSpec), true);
       if(res.meta && res.meta.valid) break;
       const engineErr=res.error && res.error.message;
       errMsg=engineErr || (res.meta&&res.meta.invalidReason) || 'no valid solution';
       if(!engineErr) break;
+      if(workSpec.run && workSpec.run.calcInduction) workSpec.run.calcInduction=false;
     }
     if(res.meta && res.meta.valid){
       lastResults.single=res;       // raw JSON kept for data export / raw bundle
@@ -1138,7 +1170,7 @@ $('#doConnect').onclick=async()=>{
   try{ const h=await probe(url,token); backend={url,token,version:h.version};
     localStorage.setItem('mm',JSON.stringify({url,token}));
     setStatus('live','connected · PyALMA3'); $('#engine').textContent='engine '+h.version; closeModal();
-    toolsBackendState();
+    toolsBackendState(); seedConsoleFromSchema($('#body').value);
   }catch(e){ err.style.display='block'; err.textContent='could not reach backend — '+e.message; }
 };
 $('#statusChip').onclick=openModal;
@@ -1153,7 +1185,7 @@ function loadSample(){ const b=$('#body').value; const m=SAMPLES[b]||SAMPLES.Eur
    data (filenames + manifest read the NEW select value at export time). */
 function resetReportState(){
   lastResults.single=null; lastSpec=null;
-  exploreState=null; inductState=null;
+  exploreState=null; inductState=null; exploreErr=null; inductErr=null;
   infState=null; curArt=null;
   ['#stSingle','#stExplore','#stInduct','#stInfer'].forEach(s=>setSecStatus(s,null));
   const of=$('#obsForm'); if(of) of.innerHTML='';
@@ -1165,7 +1197,7 @@ function resetReportState(){
   figRegistry.inference=[];
   repaintExplore(); repaintInduct();   // null states: empty panels, clears figRegistry.sweeps
 }
-$('#body').addEventListener('change', ()=>{ resetReportState(); loadSample(); markStale(); });
+$('#body').addEventListener('change', async ()=>{ resetReportState(); await seedConsoleFromSchema($('#body').value); loadSample(); markStale(); });
 $('#ocean').addEventListener('change', markStale);
 $('#core').addEventListener('change', markStale);
 $$('.con .val input').forEach(el=> el.addEventListener('input', markStale));
@@ -1227,6 +1259,31 @@ const SWEEP_Z=[
 const zLabel=k=>{ const f=SWEEP_Z.find(z=>z.k===k); return f?f.lab:k; };
 const zUnit =k=>{ const f=SWEEP_Z.find(z=>z.k===k); return f?f.u:''; };
 
+/* Body-aware ExploreOgram axis ranges, centred on the console's (schema-seeded)
+   Tb and salinity so each body sweeps its own physical neighbourhood. The fixed
+   Europa band (w 1-50, Tb 255-270) leaves small, low-pressure bodies (Enceladus,
+   Callisto) entirely below their melting-consistent Tb window → an all-hatched grid.
+   Ice-base T is capped just under the ~273 K pure-ice melting ceiling; salinity
+   scales with the native value (0 for PureH2O oceans). */
+function sweepRanges(){
+  const num=k=>{ const el=$(`.con .val input[data-k="${k}"]`); return el?parseFloat(el.value):NaN; };
+  let baseTb=num('Tb'); if(!isFinite(baseTb)) baseTb=268;
+  let baseW =num('w');  if(!isFinite(baseW))  baseW=35;
+  // Ice-base-T window anchored on the body's own (schema-seeded) Tb — the
+  // self-consistent solution. Its placement depends on how far Tb sits below the
+  // ~273 K pure-ice melting ceiling: warm, low-pressure bodies (Enceladus) converge
+  // only in a thin slice pinned just under melting, so widening downward kills the
+  // grid; colder bodies (Europa, Callisto, Ganymede) converge across a broader band
+  // extending to cooler ice bases.
+  let tHi, tLo;
+  if(baseTb>=270){ tHi=Math.min(273.0, baseTb+0.6); tLo=Math.max(240, tHi-3); }
+  else { tHi=Math.min(273.0, baseTb+2); tLo=Math.max(240, baseTb-6); }
+  let wr;
+  if(baseW<=0) wr=[0,10];   // PureH2O ocean ignores salinity; a light sweep still renders
+  else wr=[Math.max(0.5, +(baseW*0.1).toFixed(2)), +Math.max(baseW*2, baseW+40).toFixed(1)];
+  return {wr, tr:[+tLo.toFixed(2), +tHi.toFixed(2)]};
+}
+
 /* sequential colour ramp: pale field → ocean → ink (t in 0..1) */
 function lerpHex(a,b,t){ const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16);
   const r=Math.round((A>>16&255)+((B>>16&255)-(A>>16&255))*t),
@@ -1238,6 +1295,23 @@ function ramp(t){ t=Math.max(0,Math.min(1,t));
 
 let exploreState=null;   // last ExploreOgram result JSON
 let inductState=null;    // last InductOgram result JSON
+let exploreErr=null;     // last ExploreOgram failure message (graceful inline note)
+let inductErr=null;      // last InductOgram failure message (e.g. Enceladus Cassini-moment crash)
+
+/* centred, word-wrapped note painted into a heat panel when a sweep can't run for
+   the selected body — a clear inline message, never a blank or broken canvas */
+function heatNote(cv, title, msg, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,460,356);
+  const words=String(msg||'').replace(/^['"]|['"]$/g,'').split(/\s+/), lines=[]; let cur='';
+  g.font='10px '+monoStack();
+  words.forEach(w=>{ const t=cur?cur+' '+w:w;
+    if(g.measureText(t).width>W-44){ if(cur) lines.push(cur); cur=w; } else cur=t; });
+  if(cur) lines.push(cur);
+  const all=[title, ...lines.slice(0,4)], lh=15; let y=H/2-(all.length-1)*lh/2;
+  g.textAlign='center'; g.textBaseline='middle';
+  all.forEach((ln,i)=>{ g.fillStyle=i===0?INKa(.72):INKa(.5); g.font=(i===0?'600 11px ':'10px ')+monoStack(); g.fillText(ln,W/2,y); y+=lh; });
+  g.textAlign='left'; g.textBaseline='alphabetic';
+}
 
 /* fractional index of value v in the ascending sample vector vals */
 function idxOf(vals, v){
@@ -1259,7 +1333,8 @@ function drawHeatmap(cv, res, zKey, opts={}){
   let lo=Infinity,hi=-Infinity;
   for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){ const v=Z&&Z[i]?Z[i][j]:null, ok=V&&V[i]?V[i][j]:false;
     if(ok&&v!=null&&isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } }
-  if(!isFinite(lo)){ note(g,W,H,'no valid cells'); return; }
+  if(!isFinite(lo)){ heatNote(cv, 'no converged models in this sweep',
+      'the '+(meta&&meta.body||'')+' interior did not solve anywhere on the swept salinity × ice-base-T grid', opts); return; }
   const span=(hi-lo)||1;
   // cells: i→x (horizontal), j→y (vertical, larger y up)
   for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){
@@ -1338,12 +1413,18 @@ function axisTitle(k){ const a=SWEEP_AXES.find(x=>x.k===k);
   const M={sigmaMean_Sm:'σ_ocean (S m⁻¹)', D_km:'D (km)'}; return M[k]||String(k); }
 
 /* param-driven repaint shared by both heatmap panels */
-function repaintGrid(state, cvSel, metaSel, zSel){
+function repaintGrid(state, cvSel, metaSel, zSel, err){
   const cv=$(cvSel); if(!cv) return;
+  if(!state){
+    const host0=$(metaSel);
+    if(err){ heatNote(cv, 'unavailable for '+$('#body').value, err);
+      if(host0) host0.innerHTML=`<div class="mrow"><span class="mk">Status</span><span>could not compute — ${String(err).replace(/^['"]|['"]$/g,'').slice(0,90)}</span></div>`; }
+    else { drawHeatmap(cv, null, $(zSel).value); if(host0) host0.innerHTML=''; }
+    return;
+  }
   const zKey=$(zSel).value;
   const rng=drawHeatmap(cv, state, zKey);
   const host=$(metaSel); if(!host) return;
-  if(!state){ host.innerHTML=''; return; }
   const m=state.meta, moi=state.moi||{}, isInd=m.mode==='inductogram';
   const nvalid=(state.grid.VALID||[]).reduce((s,row)=>s+row.filter(Boolean).length,0);
   const ntot=m.nx*m.ny, ninv=ntot-nvalid;
@@ -1360,8 +1441,8 @@ function repaintGrid(state, cvSel, metaSel, zSel){
     `<div class="mrow"><span class="mk">Y · ${m.yName}</span><span>${fmt((state.axes.yData[0]||[])[0])}–${fmt((state.axes.yData[0]||[])[m.ny-1])}</span></div>`+
     (!isInd&&moi.Cmeasured!=null?`<div class="mrow"><span class="mk">C/MR² obs</span><span>${(+moi.Cmeasured).toFixed(3)}±${(+moi.Cupper).toFixed(3)}</span></div>`:'');
 }
-function repaintExplore(){ repaintGrid(exploreState, '#heatEx', '#exMeta', '#exZ'); regSweeps(); }
-function repaintInduct(){ repaintGrid(inductState, '#heatIn', '#inMeta', '#inZ'); regSweeps(); }
+function repaintExplore(){ repaintGrid(exploreState, '#heatEx', '#exMeta', '#exZ', exploreErr); regSweeps(); }
+function repaintInduct(){ repaintGrid(inductState, '#heatIn', '#inMeta', '#inZ', inductErr); regSweeps(); }
 
 /* report job: ExploreOgram over salinity × ice-base T (fixed 5 × 5) */
 async function runExplore(spec){
@@ -1376,16 +1457,16 @@ async function runExplore(spec){
     delete spec.bulk.zb_approximate_km;
     if(spec.bulk.Tb_K==null) spec.bulk.Tb_K=parseFloat($('.con .val input[data-k="Tb"]').value);
     if(spec.ocean.wOcean_ppt==null) spec.ocean.wOcean_ppt=parseFloat($('.con .val input[data-k="w"]').value);
-    const xr=SWEEP_AXES.find(a=>a.k===xk).r, yr=SWEEP_AXES.find(a=>a.k===yk).r;
+    const {wr,tr}=sweepRanges(), xr=wr, yr=tr;
     spec.explore={xName:xk, yName:yk, zName:SWEEP_Z.map(z=>z.k), xRange:xr, yRange:yr, nx:5, ny:5};
     const res=await runToResult(spec);
-    if(!res.grid) throw new Error('no grid returned');
-    exploreState=res;
+    if(!res.grid) throw new Error((res.error&&res.error.message)||'no grid returned');
+    exploreState=res; exploreErr=null;
     const avail=res.meta.availableZ||[];
     fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), avail.includes($('#exZ').value)?$('#exZ').value:'D_km');
     repaintExplore();
     setSecStatus('#stExplore','done');
-  }catch(e){ setSecStatus('#stExplore','error', e.message||'sweep failed'); }
+  }catch(e){ exploreState=null; exploreErr=e.message||'sweep failed'; repaintExplore(); setSecStatus('#stExplore','error', e.message); }
 }
 
 /* report job: InductOgram over ocean σ × thickness (fixed 6 × 6) */
@@ -1395,13 +1476,13 @@ async function runInduct(spec){
     delete spec.run; delete spec.explore; spec.mode='inductogram';
     spec.induct={nSigmaPts:6, nDpts:6};
     const res=await runToResult(spec);
-    if(!res.grid) throw new Error('no grid returned');
-    inductState=res;
+    if(!res.grid) throw new Error((res.error&&res.error.message)||'no grid returned');
+    inductState=res; inductErr=null;
     const avail=res.meta.availableZ||[];
     fillSel('#inZ', avail.map(k=>[k, k]), avail.includes('synodic')?'synodic':avail[0]);
     repaintInduct();
     setSecStatus('#stInduct','done');
-  }catch(e){ setSecStatus('#stInduct','error', e.message||'sweep failed'); }
+  }catch(e){ inductState=null; inductErr=e.message||'sweep failed'; repaintInduct(); setSecStatus('#stInduct','error', e.message); }
 }
 
 /* ---------------------------------------------------------------- inference */
@@ -1462,7 +1543,10 @@ let _infSeq=0;  // request-sequence token: only the newest /infer response may r
 async function doInfer(){
   const a=curArt; if(!a||!backend) return;
   const seq=++_infSeq;
-  const x_obs={}; a.obsNames.forEach(nm=>{ const el=$('#obs_'+nm); if(el&&el.value!=='') x_obs[nm]=+el.value; });
+  // getElementById (exact attribute match) — obs names may contain spaces
+  // (e.g. 'synodic 2nd'), which make '#obs_'+nm an invalid CSS selector and
+  // throw SyntaxError out of querySelector, breaking the whole inference section.
+  const x_obs={}; a.obsNames.forEach(nm=>{ const el=document.getElementById('obs_'+nm); if(el&&el.value!=='') x_obs[nm]=+el.value; });
   const r=await api('/infer',{method:'POST',body:JSON.stringify({artifact:a.id,x_obs,nSamples:10000,seed:0})});
   const inf=await r.json();
   if(seq!==_infSeq) return;  // superseded by a newer request; drop stale response
@@ -1509,11 +1593,23 @@ function smooth121(a, n){
   return c;
 }
 function drawCorner(cv, inf, opts={}){
+  // high-D posteriors (D>8) collapse the two-column layout into an illegible smear;
+  // switch the live panel to one full-width column BEFORE measuring so cells get room.
+  if(!opts.export){ const wrap=cv.closest('.cornerwrap');
+    if(wrap) wrap.classList.toggle('wide', !!(inf&&inf.paramNames&&inf.paramNames.length>8)); }
   const {g,W,H}=ctx2d(cv,opts,700,700);
   if(!inf||!inf.samples||!inf.samples.length){ note(g,W,H,'generate the report'); return; }
   const S=inf.samples, names=inf.paramNames, labs=(inf.paramLabels||names).map(texClean);
   const D=names.length, pad=50, gap=3, botPad=34;
   const cell=(Math.min(W,H)-pad-botPad)/D;
+  // cell-aware type: shrink labels and thin out ticks as cells get small so a
+  // dense corner stays legible instead of overlapping into a smear.
+  const tickFS=Math.max(6, Math.min(7.5, cell*0.16));   // tick-number font
+  const nameFS=Math.max(6.5, Math.min(8.5, cell*0.18)); // param-name font
+  const showTickLabels=cell>=34;                        // below this, ticks marks only
+  const nTicks=cell<44?2:3;
+  const showMedAnn=cell>=46;                            // diagonal median annotation
+  const nameLen=Math.max(6, Math.min(12, Math.round(cell/6)));
   // per-param display range = [p0.5,p99.5]
   const rng=names.map((_,c)=>{ const col=S.map(r=>r[c]).filter(isFinite).sort((a,b)=>a-b);
     const q=p=>col[Math.max(0,Math.min(col.length-1,Math.floor(p*col.length)))];
@@ -1537,10 +1633,13 @@ function drawCorner(cv, inf, opts={}){
       const s=(inf.summary||{})[names[c]]||{};
       if(s.median!=null){ const mx2=px(c,s.median); g.strokeStyle='#E4322B'; g.lineWidth=1;
         g.beginPath(); g.moveTo(mx2,y0+gap); g.lineTo(mx2,y0+cell-gap); g.stroke();
-        const up=s.p84!=null?s.p84-s.median:null, dn=s.p16!=null?s.median-s.p16:null;
-        const txt=fmtSig(s.median)+(up!=null?' +'+fmtSig(up):'')+(dn!=null?' −'+fmtSig(dn):'');
-        g.fillStyle=INK; g.font='7.5px '+monoStack(); g.textAlign='center';
-        g.fillText(txt, x0+cell/2, y0-3); }
+        // median±68% annotation only when the cell is wide enough to hold it (the
+        // full numbers still appear in the summary table beside the plot)
+        if(showMedAnn){
+          const up=s.p84!=null?s.p84-s.median:null, dn=s.p16!=null?s.median-s.p16:null;
+          const txt=fmtSig(s.median)+(up!=null?' +'+fmtSig(up):'')+(dn!=null?' −'+fmtSig(dn):'');
+          g.fillStyle=INK; g.font='7.5px '+monoStack(); g.textAlign='center';
+          g.fillText(txt, x0+cell/2, y0-3); } }
     } else {
       // 2D scatter (param c on x, param r on y) under 1σ/2σ density contours
       g.fillStyle=hexA('#22242A',.16);
@@ -1572,28 +1671,31 @@ function drawCorner(cv, inf, opts={}){
         });
       }
     }
-    // tick values on bottom row + left column only (2-3 majors, inward 3px)
+    // tick values on bottom row + left column only (2-3 majors, inward 3px);
+    // tick count and labels thin out as cells shrink so numbers never overlap.
     if(r===D-1){
-      const t=linTicks(rng[c][0],rng[c][1],3);
+      const t=linTicks(rng[c][0],rng[c][1],nTicks);
       t.majors.forEach(v=>{ const X2=Math.round(px(c,v))+.5;
         g.strokeStyle=INKa(.45); g.lineWidth=1;
         g.beginPath(); g.moveTo(X2, pad+D*cell-1); g.lineTo(X2, pad+D*cell-4); g.stroke();
-        g.fillStyle=INKa(.62); g.font='7.5px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
+        if(!showTickLabels) return;
+        g.fillStyle=INKa(.62); g.font=tickFS+'px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
         g.fillText(fmtTick(v,t.step), px(c,v), pad+D*cell+3); g.textBaseline='alphabetic'; });
     }
     if(c===0&&r>0){
-      const t=linTicks(rng[r][0],rng[r][1],3);
+      const t=linTicks(rng[r][0],rng[r][1],nTicks);
       t.majors.forEach(v=>{ const Y2=Math.round(py(r,v))+.5;
         g.strokeStyle=INKa(.45); g.lineWidth=1;
         g.beginPath(); g.moveTo(pad+1,Y2); g.lineTo(pad+4,Y2); g.stroke();
-        g.fillStyle=INKa(.62); g.font='7.5px '+monoStack(); g.textAlign='right'; g.textBaseline='middle';
+        if(!showTickLabels) return;
+        g.fillStyle=INKa(.62); g.font=tickFS+'px '+monoStack(); g.textAlign='right'; g.textBaseline='middle';
         g.fillText(fmtTick(v,t.step), pad-4, py(r,v)); g.textBaseline='alphabetic'; });
     }
-    // param name labels, outward of the tick labels
-    if(c===0){ g.save(); g.fillStyle=INK; g.font='8.5px '+monoStack(); g.textAlign='center';
-      g.translate(10, y0+cell/2); g.rotate(-Math.PI/2); g.fillText(labs[r].slice(0,12),0,0); g.restore(); }
-    if(r===D-1){ g.fillStyle=INK; g.font='8.5px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
-      g.fillText(labs[c].slice(0,12), x0+cell/2, pad+D*cell+20); g.textBaseline='alphabetic'; }
+    // param name labels, outward of the tick labels (font + truncation cell-aware)
+    if(c===0){ g.save(); g.fillStyle=INK; g.font=nameFS+'px '+monoStack(); g.textAlign='center';
+      g.translate(10, y0+cell/2); g.rotate(-Math.PI/2); g.fillText(labs[r].slice(0,nameLen),0,0); g.restore(); }
+    if(r===D-1){ g.fillStyle=INK; g.font=nameFS+'px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
+      g.fillText(labs[c].slice(0,nameLen), x0+cell/2, pad+D*cell+20); g.textBaseline='alphabetic'; }
   }
 }
 function renderSummary(inf){
@@ -1955,7 +2057,7 @@ $('#exportAll').onclick=exportReport;
   const saved=localStorage.getItem('mm');
   if(saved){ try{ const {url,token}=JSON.parse(saved); const h=await probe(url,token);
     backend={url,token,version:h.version}; setStatus('live','connected · PyALMA3'); $('#engine').textContent='engine '+h.version;
-    toolsBackendState();
+    toolsBackendState(); seedConsoleFromSchema($('#body').value);
   }catch(_){ setStatus('sample','disconnected · sample'); } }
 })();
 </script>

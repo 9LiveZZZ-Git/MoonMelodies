@@ -56,6 +56,7 @@ Then add a slot to `_SLOTS` in `PlanetProfile/API/inference.py` (file + config +
 | Callisto | `callisto_nacl_andrade_8D` | 8D / CMR2,k2,h2,induction (11 obs) | 725k | 7/8 | `Tb` prior-dominated (KS p ~0.01); intrinsic — matches the deployed Europa-Clipper flows, which also SBC-fail on diffuse `Tb` |
 
 `Tb` (ice-base temperature) is weakly identified by CMR2/k2/h2/induction; more sims did not
-help (0.0155 at 362k → 0.0092 at 725k), so it is treated as diffuse rather than a defect, per
-the upstream precedent. The primary bar is **SBC-calibrated + samples-in-prior**; the
+help (0.0155 at 362k → 0.0092 at 725k), and a MAF flow on the same 725k dataset was *worse*
+(SBC-failed 3 params vs NSF's 1), so `Tb` fails in both flow families — it is treated as
+diffuse rather than a defect, per the upstream precedent. NSF is the deployed Callisto flow. The primary bar is **SBC-calibrated + samples-in-prior**; the
 `limits` and `crosscheck` gates are secondary evidence (crosscheck needs a reference MCMC).
