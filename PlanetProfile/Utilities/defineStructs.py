@@ -3263,6 +3263,14 @@ class ConstantsStruct:
     def __init__(self):
         """ General physical constants """
         self.G = 6.673e-11  # "Big G" gravitational constant, m^3/kg/s
+        self.parentMass_kg = {  # Mass of parent (host) planet in kg, keyed by ParentName() output. Used to derive the moon's semi-major axis a = (G*M_parent/n^2)^(1/3) in the Inference gravity/Love-number forward model.
+            'Jupiter': 1.89813e27,
+            'Saturn': 5.6834e26,
+            'Uranus': 8.6810e25,
+            'Neptune': 1.02413e26,
+            'Earth': 5.9722e24,
+            'Pluto': 1.303e22
+        }
         self.bar2GPa = 1.01325e-4  # Multiply by this to convert pressure from bars to GPa
         self.bar2MPa = 1.01325e-1  # Same but for MPa
         self.erg2J = 1e-7  # Multiply by this to convert from ergs to joules
