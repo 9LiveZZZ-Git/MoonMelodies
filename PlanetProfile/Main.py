@@ -1816,6 +1816,14 @@ def RunInductGrid(Planet, Params):
     Params.CALC_CONDUCT = True
     Planet, Params = SetupInduction(Planet, Params)
 
+    # Excitation moments must have loaded for a meaningful induction sweep. Some bodies
+    # (e.g. Enceladus on this sigma path) have no loadable excitation spectrum here, which
+    # would otherwise yield an empty/None response grid; fail cleanly instead so callers can
+    # report "not supported for this body" rather than surfacing malformed data.
+    if getattr(Planet.Magnetic, 'Benm_nT', None) is None:
+        raise ValueError(f'Induction excitation moments are unavailable for {bodyname}; '
+                         f'the conductivity-thickness inductogram is not supported for this body.')
+
     sigmaList = np.logspace(Params.Induct.sigmaMin[bodyname], Params.Induct.sigmaMax[bodyname], Params.Induct.nSigmaPts)
     Dlist = np.logspace(Params.Induct.Dmin[bodyname], Params.Induct.Dmax[bodyname], Params.Induct.nDpts)
     Params.nModels = Params.Induct.nSigmaPts * Params.Induct.nDpts

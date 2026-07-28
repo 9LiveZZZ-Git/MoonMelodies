@@ -307,15 +307,18 @@ def ExtractInductionData(InductionResults, bodyname, PlanetGrid, Params):
         induction_data['Bi1x_nT'] = Bi1x_nT_3D
         induction_data['Bi1y_nT'] = Bi1y_nT_3D
         induction_data['Bi1z_nT'] = Bi1z_nT_3D
-        # Calculate induced field components
-        # Extract magnetic induction results from the PlanetGrid
+        # Applied-excitation field components (Bex/Bey/Bez) require the excitation moments
+        # Benm_nT. Some bodies (e.g. Enceladus in a sigma inductogram) don't have them loaded
+        # on this path, in which case the *derived* applied-field components are skipped — the
+        # Amp/Phase response grid (the primary induction result, set in the per-cell loop
+        # above) is still returned, so the inductogram remains usable.
         Benm_nT = PlanetGrid[0, 0].Magnetic.Benm_nT
-        # Organize data into a format that can be plotted/saved for plotting
-        from PlanetProfile.MagneticInduction.MagneticInduction import Benm2absBexyz
-        Bex_nT, Bey_nT, Bez_nT = Benm2absBexyz(Benm_nT)
-        induction_data['Bix_nT'] = np.array([Amp_3d[i, ...] * Bex_nT[i] for i in range(nPeaks)])
-        induction_data['Biy_nT'] = np.array([Amp_3d[i, ...] * Bey_nT[i] for i in range(nPeaks)])
-        induction_data['Biz_nT'] = np.array([Amp_3d[i, ...] * Bez_nT[i] for i in range(nPeaks)])
+        if Benm_nT is not None:
+            from PlanetProfile.MagneticInduction.MagneticInduction import Benm2absBexyz
+            Bex_nT, Bey_nT, Bez_nT = Benm2absBexyz(Benm_nT)
+            induction_data['Bix_nT'] = np.array([Amp_3d[i, ...] * Bex_nT[i] for i in range(nPeaks)])
+            induction_data['Biy_nT'] = np.array([Amp_3d[i, ...] * Bey_nT[i] for i in range(nPeaks)])
+            induction_data['Biz_nT'] = np.array([Amp_3d[i, ...] * Bez_nT[i] for i in range(nPeaks)])
         induction_data['rBi1x_nT'] = np.real(induction_data['Bi1x_nT'])
         induction_data['rBi1y_nT'] = np.real(induction_data['Bi1y_nT'])
         induction_data['rBi1z_nT'] = np.real(induction_data['Bi1z_nT'])
