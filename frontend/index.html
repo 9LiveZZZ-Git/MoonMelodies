@@ -117,7 +117,7 @@ canvas{display:block; width:100%; height:100%}
 .chip{font:600 9.5px var(--display); letter-spacing:.1em; text-transform:uppercase; border:1px solid var(--hair2); background:var(--paper);
   color:var(--ink); padding:4px 10px; border-radius:2px; cursor:pointer; opacity:.55}
 .chip.on{opacity:1; border-color:var(--ink)}
-.profbox{height:150px; position:relative}
+.profbox{height:216px; position:relative}
 
 .rrow{display:flex; align-items:baseline; justify-content:space-between; gap:14px; padding:9px 3px; border-bottom:1px solid var(--hair)}
 .rrow:first-child{border-top:1px solid var(--hair)}
@@ -148,40 +148,42 @@ footer{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; ma
 /* ---- figure suite ------------------------------------------------------- */
 #figures{margin-top:6px}
 .fsec{margin-top:32px}
-.fhead{font:700 11px var(--display); letter-spacing:.16em; text-transform:uppercase; color:var(--ink);
+.fhead{display:flex; align-items:baseline; gap:10px;
+  font:700 11px var(--display); letter-spacing:.16em; text-transform:uppercase; color:var(--ink);
   padding-bottom:8px; border-bottom:1px solid var(--ink); margin-bottom:16px}
+.fhead .fsp{flex:1}
 .fgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(228px,1fr)); gap:22px 24px}
 .fgrid.two{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
 .fig{margin:0}
 figcaption{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:7px}
 .ft{font:600 10.5px var(--display); letter-spacing:.09em; text-transform:uppercase; color:var(--ink)}
 .fu{font:9.5px var(--mono); letter-spacing:.04em; color:var(--ink); opacity:.45}
-.figbox{position:relative; height:152px; border:1px solid var(--hair); background:var(--field)}
+.figbox{position:relative; height:216px; border:1px solid var(--hair); background:var(--field)}
 .figbox canvas{display:block; width:100%; height:100%}
 .extras{margin-top:34px}
 
-/* ---- advanced tools: sweep + inference ---------------------------------- */
+/* ---- report sections: sweeps + inference -------------------------------- */
 .tool{margin-top:40px}
 .tool .fhead{border-bottom:1px solid var(--ink)}
 .toolctl{display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 24px; padding:6px 0 16px}
 .toolctl .cell{gap:6px}
-.rng{display:flex; align-items:center; gap:6px}
-.rng input{width:64px; text-align:right}
-.rng .dash{opacity:.4; font:12px var(--mono)}
-.fixedax{font:12px/1.3 var(--mono); color:var(--ink); border:1px solid var(--hair2); border-radius:2px; padding:7px 10px}
 .needs{font:11px var(--mono); letter-spacing:.04em; color:var(--ink); opacity:.55; padding:14px 0}
 .needs b{font-weight:600; opacity:.85}
 
-/* heatmap */
-.heatwrap{display:grid; grid-template-columns:1fr 210px; gap:24px}
-@media(max-width:720px){ .heatwrap{grid-template-columns:1fr} }
-.heatbox{aspect-ratio:auto; height:360px; border:1px solid var(--hair); background:var(--field)}
-.heatmeta{display:flex; flex-direction:column; gap:0}
+/* per-section status + stale note */
+.secstat{font:400 10px var(--mono); letter-spacing:.08em; margin-left:10px; opacity:.5}
+.secstat[data-s="running"],.secstat[data-s="error"]{color:var(--red); opacity:1}
+.secstat[data-s="done"]{opacity:.45}
+.stale{font:11px var(--mono); letter-spacing:.04em; color:var(--red); margin-top:6px}
+
+/* heatmaps, side by side */
+.sweepgrid{display:grid; grid-template-columns:1fr 1fr; gap:32px 36px}
+@media(max-width:820px){ .sweepgrid{grid-template-columns:1fr} }
+.heatbox{aspect-ratio:auto; height:356px; border:1px solid var(--hair); background:var(--field)}
+.heatmeta{display:flex; flex-direction:column; gap:0; margin-top:14px}
 .heatmeta .mrow{display:flex; justify-content:space-between; gap:12px; padding:8px 2px; border-bottom:1px solid var(--hair); font:11px var(--mono)}
 .heatmeta .mrow:first-child{border-top:1px solid var(--hair)}
 .heatmeta .mk{opacity:.6; text-transform:uppercase; letter-spacing:.08em; font-size:10px; font-family:var(--display); font-weight:600}
-.heatmeta .cbar{height:12px; margin:14px 0 4px; border:1px solid var(--hair2)}
-.heatmeta .cbl{display:flex; justify-content:space-between; font:9.5px var(--mono); opacity:.55}
 
 /* corner plot + summary */
 .cornerwrap{display:grid; grid-template-columns:minmax(0,1fr) 268px; gap:24px; align-items:start}
@@ -199,10 +201,23 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 .srow .sp{font:11px var(--mono)}
 .srow .sv{font:11.5px var(--mono); text-align:right}
 .srow .su{font:9px var(--mono); opacity:.4; margin-left:3px}
+.artpick{margin:2px 0 14px; gap:6px}
+.artpick select{max-width:min(100%,460px)}
 .scope{font:11px/1.6 var(--mono); color:var(--ink); opacity:.68; border-left:2px solid var(--ocean); padding:6px 0 6px 12px; margin:2px 0 14px}
 .guards{margin-top:14px; display:flex; flex-direction:column; gap:6px}
 .gban{font:10.5px/1.5 var(--mono); letter-spacing:.02em; color:var(--ink); background:var(--field); border:1px solid var(--hair2); border-left:2px solid var(--red); padding:8px 12px}
 .gban.ok{border-left-color:var(--ocean)}
+
+/* ---- exports ------------------------------------------------------------ */
+.exbtns{display:inline-flex; gap:6px}
+.exb{font:600 9px var(--display); letter-spacing:.12em; text-transform:uppercase;
+  border:1px solid var(--hair2); background:var(--paper); color:var(--ink);
+  padding:3px 9px; border-radius:2px; cursor:pointer; opacity:.6}
+.exb:hover{opacity:1; border-color:var(--ink)}
+.exb[disabled]{opacity:.25; cursor:default; pointer-events:none}
+.compute.ghost{border-color:var(--hair2)}
+.compute.ghost:hover{border-color:var(--ink)}
+.cell .compute+.compute{margin-top:8px}
 
 @media(prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important} }
 </style>
@@ -260,11 +275,14 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 
     <div class="cell">
       <span class="clab">&nbsp;</span>
-      <button class="compute" id="run"><span class="rl">Compute</span><span class="arw" aria-hidden="true">&#9656;</span></button>
+      <button class="compute" id="run"><span class="rl">Generate report</span><span class="arw" aria-hidden="true">&#9656;</span></button>
+      <button class="compute ghost" id="exportAll">Export report</button>
+      <div class="stale" id="staleNote" hidden>inputs changed &mdash; report is stale</div>
     </div>
   </div>
 
   <section class="plate" aria-label="Interior cross-section plate">
+    <div class="fhead">Interior model <span class="secstat" id="stSingle"></span><span class="fsp"></span><span class="exbtns" data-sec="interior"><button class="exb" data-ex="figures">figures &#8615;</button><button class="exb" data-ex="data">data &#8615;</button></span></div>
     <div class="canvasbox">
       <canvas id="cut" aria-label="To-scale radial cross-section of the selected body"></canvas>
     </div>
@@ -290,43 +308,39 @@ figcaption{display:flex; align-items:baseline; justify-content:space-between; ga
 
   <section id="figures" aria-label="Model figures"></section>
 
-  <!-- ExploreOgram: 2-D parameter sweep -->
-  <section class="tool" id="exploreSec" aria-label="Two-parameter sweep">
-    <div class="fhead">2-D parameter sweep</div>
-    <div class="toolctl">
-      <div class="cell"><span class="clab">Sweep</span>
-        <select id="exMode" aria-label="Sweep type"><option value="exploreogram">Interior structure · ExploreOgram</option><option value="inductogram">Induction response · InductOgram</option></select></div>
-      <div class="cell axcell"><span class="clab">X axis</span>
-        <select id="exX" aria-label="Sweep X parameter"></select>
-        <div class="rng"><input id="exX0" class="mono tnum" inputmode="decimal" aria-label="X min"><span class="dash">–</span><input id="exX1" class="mono tnum" inputmode="decimal" aria-label="X max"></div></div>
-      <div class="cell axcell"><span class="clab">Y axis</span>
-        <select id="exY" aria-label="Sweep Y parameter"></select>
-        <div class="rng"><input id="exY0" class="mono tnum" inputmode="decimal" aria-label="Y min"><span class="dash">–</span><input id="exY1" class="mono tnum" inputmode="decimal" aria-label="Y max"></div></div>
-      <div class="cell indnote" hidden><span class="clab">Axes</span><div class="fixedax mono">ocean σ × thickness<br><span style="opacity:.55">log-spaced, from config</span></div></div>
-      <div class="cell"><span class="clab">Grid</span>
-        <select id="exN" aria-label="Grid resolution"><option value="5">5 × 5</option><option value="7">7 × 7</option><option value="9">9 × 9</option></select></div>
-      <div class="cell"><span class="clab" id="exZlab">Color by</span><select id="exZ" aria-label="Colour field"></select></div>
-      <div class="cell"><span class="clab">&nbsp;</span><button class="compute" id="runGrid"><span class="rl">Run sweep</span><span class="arw" aria-hidden="true">&#9656;</span></button></div>
-    </div>
-    <div class="needs" id="exNeeds" hidden><b>Connect the engine</b> to run a live sweep — each grid cell is a full interior model.</div>
-    <div class="heatwrap">
-      <div class="canvasbox heatbox"><canvas id="heat" aria-label="Sweep heatmap"></canvas></div>
-      <div class="heatmeta" id="heatMeta"></div>
+  <!-- Parameter sweeps: ExploreOgram + InductOgram side by side -->
+  <section class="tool" id="sweepSec" aria-label="Parameter sweeps">
+    <div class="fhead">Parameter sweeps<span class="fsp"></span><span class="exbtns" data-sec="sweeps"><button class="exb" data-ex="figures">figures &#8615;</button><button class="exb" data-ex="data">data &#8615;</button></span></div>
+    <div class="needs" id="exNeeds" hidden><b>Connect the engine</b> to generate the sweeps — each grid cell is a full interior model.</div>
+    <div class="sweepgrid">
+      <div class="sweepcol">
+        <div class="kick">ExploreOgram · salinity &times; ice-base T <span class="secstat" id="stExplore"></span></div>
+        <div class="toolctl">
+          <div class="cell"><span class="clab">Color by</span><select id="exZ" aria-label="Colour field"></select></div>
+        </div>
+        <div class="canvasbox heatbox"><canvas id="heatEx" aria-label="ExploreOgram sweep heatmap"></canvas></div>
+        <div class="heatmeta" id="exMeta"></div>
+      </div>
+      <div class="sweepcol">
+        <div class="kick">InductOgram · ocean &sigma; &times; thickness <span class="secstat" id="stInduct"></span></div>
+        <div class="toolctl">
+          <div class="cell"><span class="clab">Excitation</span><select id="inZ" aria-label="Excitation"></select></div>
+        </div>
+        <div class="canvasbox heatbox"><canvas id="heatIn" aria-label="InductOgram induction heatmap"></canvas></div>
+        <div class="heatmeta" id="inMeta"></div>
+      </div>
     </div>
   </section>
 
   <!-- Bayesian inference -->
   <section class="tool" id="inferSec" aria-label="Amortized Bayesian inference">
-    <div class="fhead">Bayesian inference · amortized SBI</div>
-    <div class="toolctl">
-      <div class="cell"><span class="clab">Trained posterior</span><select id="infArt" aria-label="Inference artifact"></select></div>
-      <div class="cell"><span class="clab">Draws</span><select id="infN" aria-label="Posterior draws"><option>3000</option><option selected>10000</option><option>20000</option></select></div>
-      <div class="cell"><span class="clab">&nbsp;</span><button class="compute" id="runInfer"><span class="rl">Sample posterior</span><span class="arw" aria-hidden="true">&#9656;</span></button></div>
-    </div>
+    <div class="fhead">Bayesian inference · amortized SBI <span class="secstat" id="stInfer"></span><span class="fsp"></span><span class="exbtns" data-sec="inference"><button class="exb" data-ex="figures">figures &#8615;</button><button class="exb" data-ex="data">data &#8615;</button></span></div>
     <div class="needs" id="infNeeds" hidden><b>Connect the engine</b> to sample the downloaded posteriors.</div>
+    <div class="needs" id="infNone" hidden></div>
+    <div class="cell artpick" id="artPickCell" hidden><span class="clab">Posterior model</span><select id="infArt" aria-label="Trained posterior model"></select></div>
     <div class="scope" id="infScope" hidden></div>
     <div class="obsform" id="obsForm"></div>
-    <div class="cornerwrap">
+    <div class="cornerwrap" id="cornerWrap">
       <div class="canvasbox cornerbox"><canvas id="corner" aria-label="Posterior corner plot"></canvas></div>
       <div class="summtab" id="summTab"></div>
     </div>
@@ -479,11 +493,9 @@ function cutLayout(W,H){
   const maxR   = narrow ? Math.min(W,H)*0.40 : Math.min(H*0.42, W*0.30);
   return {narrow, discCX, discCY, maxR};
 }
-function drawCut(model, revealT){
-  const cv=$('#cut'), box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||600, H=box.clientHeight||400;
-  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
-  g.clearRect(0,0,W,H);
+function drawCut(model, revealT, opts={}){
+  const cv=opts.cv||$('#cut');
+  const {g,W,H}=ctx2d(cv,opts,600,400);
   const {narrow,discCX,discCY,maxR}=cutLayout(W,H);
   const {r_m,phase}=model.layers, R=model.R_m;
   const reveal = revealT==null?1:revealT;
@@ -494,29 +506,33 @@ function drawCut(model, revealT){
   drawGrid(g,px0,py0,pS);
   g.strokeStyle=INKa(.12); g.lineWidth=1; g.strokeRect(px0+.5,py0+.5,pS-1,pS-1);
 
-  // flat radial fills
+  // flat radial fills: exact annulus path (0→2π clockwise, 2π→0 anticlockwise —
+  // an over-swept 0→7 inner arc mis-winds and leaves a 41° gap), with the inner
+  // edge extended slightly so adjacent sub-pixel layers overlap instead of
+  // leaving antialiasing seams (moiré)
   for(let i=0;i<r_m.length-1;i++){
     const ro=r_m[i]/R*maxR, ri=r_m[i+1]/R*maxR;
     if((1-ri/maxR)>reveal) continue;
     g.fillStyle=pOf(phase[i]).c;
-    g.beginPath(); g.arc(discCX,discCY,ro,0,7); g.arc(discCX,discCY,ri,0,7,true); g.fill();
+    g.beginPath(); g.arc(discCX,discCY,ro,0,2*Math.PI);
+    g.arc(discCX,discCY,Math.max(0,ri-0.75),2*Math.PI,0,true); g.fill();
   }
   // interface hairlines
   g.lineWidth=1; g.strokeStyle=INKa(.8);
   for(let i=1;i<phase.length;i++){
     if(pOf(phase[i]).grp!==pOf(phase[i-1]).grp){
       const rr=r_m[i]/R*maxR;
-      if((1-rr/maxR)<=reveal){ g.beginPath(); g.arc(discCX,discCY,rr,0,7); g.stroke(); }
+      if((1-rr/maxR)<=reveal){ g.beginPath(); g.arc(discCX,discCY,rr,0,2*Math.PI); g.stroke(); }
     }
   }
   // outer edge
-  g.strokeStyle=INK; g.lineWidth=1; g.beginPath(); g.arc(discCX,discCY,maxR,0,7); g.stroke();
+  g.strokeStyle=INK; g.lineWidth=1; g.beginPath(); g.arc(discCX,discCY,maxR,0,2*Math.PI); g.stroke();
 
   const gs=groups(model);
   // hover: brighten that band toward ocean blue
   if(hoverGroup){
     const hg=gs.find(x=>x.grp===hoverGroup);
-    if(hg){ g.strokeStyle=GRP_COLOR.ocean; g.lineWidth=1.8; g.beginPath(); g.arc(discCX,discCY,hg.outer/R*maxR,0,7); g.stroke(); }
+    if(hg){ g.strokeStyle=GRP_COLOR.ocean; g.lineWidth=1.8; g.beginPath(); g.arc(discCX,discCY,hg.outer/R*maxR,0,2*Math.PI); g.stroke(); }
   }
   // total-radius label
   g.fillStyle=INKa(.5); g.font='10px '+monoStack(); g.textAlign='center'; g.textBaseline='alphabetic';
@@ -538,7 +554,7 @@ function drawCut(model, revealT){
       g.beginPath(); g.moveTo(bx,by); g.lineTo(ax,ty); g.lineTo(colX-6,ty); g.stroke();
       // boundary tick
       g.fillStyle = reg ? '#E4322B' : (lit?GRP_COLOR.ocean:INK);
-      g.beginPath(); g.arc(bx,by,2.4,0,7); g.fill();
+      g.beginPath(); g.arc(bx,by,2.4,0,2*Math.PI); g.fill();
       // callout: label (caps sans) + value (mono)
       g.textAlign='left';
       g.fillStyle=INK; g.font='700 10.5px '+dispStack();
@@ -551,38 +567,19 @@ function drawCut(model, revealT){
 const monoStack=()=>'ui-monospace,Menlo,Consolas,monospace';
 const dispStack=()=>'"Helvetica Neue",Helvetica,Arial,sans-serif';
 
-/* --------------------------------------------------------- radial profile */
-function drawProf(model){
-  const cv=$('#prof'), box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||300, H=box.clientHeight||140;
-  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
-  g.clearRect(0,0,W,H);
-  const key=profQ==='rho'?'rho_kgm3':profQ==='T'?'T_K':'P_MPa';
-  const arr=model.layers[key], R=model.R_m, r=model.layers.r_m;
-  const lo=Math.min(...arr), hi=Math.max(...arr);
-  const pl=8, pr=8, pt=14, pb=16;
-  const x=i=>pl+(1-r[i]/R)*(W-pl-pr);
-  const y=v=>H-pb-((v-lo)/((hi-lo)||1))*(H-pt-pb);
-  // group boundary verticals
-  g.strokeStyle=INKa(.10); g.lineWidth=1;
-  groups(model).forEach(it=>{ if(it.inner<=0) return; const xi=pl+(1-it.inner/R)*(W-pl-pr)+.5;
-    g.beginPath(); g.moveTo(xi,pt); g.lineTo(xi,H-pb); g.stroke(); });
-  // axes
-  g.strokeStyle=INKa(.25); g.lineWidth=1;
-  g.beginPath(); g.moveTo(pl,H-pb+.5); g.lineTo(W-pr,H-pb+.5); g.stroke();
-  g.beginPath(); g.moveTo(pl+.5,pt); g.lineTo(pl+.5,H-pb); g.stroke();
-  // trace
-  g.beginPath(); for(let i=0;i<arr.length;i++){ const X=x(i),Y=y(arr[i]); i?g.lineTo(X,Y):g.moveTo(X,Y); }
-  g.strokeStyle=INK; g.lineWidth=1.4; g.stroke();
-  // labels
-  const unit=profQ==='rho'?'kg/m³':profQ==='T'?'K':'MPa';
-  g.fillStyle=INKa(.55); g.font='9.5px '+monoStack(); g.textAlign='left';
-  g.fillText(fmt(hi)+' '+unit, pl+2, pt-3);
-  g.fillText(fmt(lo), pl+2, H-4);
-  g.textAlign='right'; g.fillStyle=INKa(.4);
-  g.fillText('center', W-pr, H-4);
+/* --------------------------------------------------------- radial profile
+   thin wrappers over plotXY so the profile panel and figure suite are
+   pixel-identical in style; profChart is the per-quantity core the export
+   pass re-renders offscreen. */
+function profChart(cv, model, key, opts={}){
+  plotXY(cv, { r_km:model.layers.r_m.map(v=>v/1000), R_km:model.R_m/1000,
+    phase:model.layers.phase, ylab:axLabel(key),
+    series:[{y:model.layers[key], color:INK}] }, opts);
 }
-function fmt(v){ return v>=1e4?v.toExponential(1):v>=100?Math.round(v):v.toFixed(1); }
+function drawProf(model, opts={}){
+  const key=profQ==='rho'?'rho_kgm3':profQ==='T'?'T_K':'P_MPa';
+  profChart(opts.cv||$('#prof'), model, key, opts);
+}
 
 /* ------------------------------------------------------- callouts + reads */
 function bindRows(){
@@ -630,96 +627,314 @@ function renderMeta(model){
 const hexA=(hex,a)=>{ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16&255},${(n>>8)&255},${n&255},${a})`; };
 const grpId=ph=>pOf(ph).grp;
 const grpTintOf=ph=>hexA(GRP_COLOR[pOf(ph).grp]||'#B9AE9E', pOf(ph).grp==='core'?0.05:0.10);
-const xfOf=model=>{ const R=model.R_m; return model.layers.r_m.map(v=>1-v/R); };
 const sup=n=>String(n).split('').map(c=>({'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'}[c]||c)).join('');
 
-/* Radial-Plate line chart: series[{y,color,w,label}] over a shared xf (0 surface .. 1 center). */
-function plotXY(cv, o){
-  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||240, H=box.clientHeight||140;
-  cv.width=W*dpr; cv.height=H*dpr; const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
-  g.clearRect(0,0,W,H);
-  const pl=42, pr=8, pt=10, pb=15, IW=W-pl-pr, IH=H-pt-pb;
+/* ===================================================== shared chart primitives
+   Renderer contract: every drawX(cv, data, opts) takes opts {w,h,dpr,export}.
+   Omitted w/h -> parent box size (live path); export:true -> white background.
+   Offscreen export canvases have no parent, hence the parentElement guard. */
+function ctx2d(cv, opts, defW, defH){
+  const W = opts.w  ?? (cv.parentElement ? cv.parentElement.clientWidth  || defW : defW);
+  const H = opts.h  ?? (cv.parentElement ? cv.parentElement.clientHeight || defH : defH);
+  const dpr = opts.dpr ?? Math.min(2, devicePixelRatio||1);
+  cv.width=W*dpr; cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  if(opts.export){ g.fillStyle='#FFFFFF'; g.fillRect(0,0,W,H); }
+  return {g,W,H};
+}
+
+/* canonical axis labels: engine-extracted table wins, hard fallback below */
+const LBL = Object.assign({
+  r_m:{sym:'r',unit:'km'},                       // NB displayed in km
+  rho_kgm3:{sym:'ρ',unit:'kg m⁻³'}, T_K:{sym:'T',unit:'K'}, P_MPa:{sym:'P',unit:'MPa'},
+  g_ms2:{sym:'g',unit:'m s⁻²'}, Cp_JkgK:{sym:'Cₚ',unit:'J kg⁻¹ K⁻¹'},
+  alpha_pK:{sym:'α',unit:'K⁻¹'}, kTherm_WmK:{sym:'k_T',unit:'W m⁻¹ K⁻¹'},
+  sigma_Sm:{sym:'σ',unit:'S m⁻¹'}, phi_frac:{sym:'φ',unit:''},
+  VP_kms:{sym:'V_P',unit:'km s⁻¹'}, VS_kms:{sym:'V_S',unit:'km s⁻¹'}, QS:{sym:'Q_S',unit:''},
+  KS_GPa:{sym:'K_S',unit:'GPa'}, GS_GPa:{sym:'G_S',unit:'GPa'},
+  eta_Pas:{sym:'η',unit:'Pa s'}, Htidal_Wm3:{sym:'H_tidal',unit:'W m⁻³'},
+}, window.ENGINE_LBL||{});
+const axLabel = k => LBL[k] ? (LBL[k].sym + (LBL[k].unit?` (${LBL[k].unit})`:'')) : String(k);
+
+/* tick engine: 4-6 labeled majors per axis (target 5) */
+function niceStep(span, target=5){ if(!(span>0)) return 1;
+  const raw=span/target, p=10**Math.floor(Math.log10(raw));
+  for(const m of [1,2,2.5,5,10]) if(m*p>=raw) return m*p; }
+function linTicks(lo, hi, target=5){
+  const step=niceStep(hi-lo,target), t0=Math.ceil(lo/step)*step;
+  const majors=[]; for(let v=t0;v<=hi+1e-9*step;v+=step) majors.push(+v.toFixed(12));
+  const ms=step/5, m0=Math.ceil(lo/ms)*ms, minors=[];
+  for(let v=m0;v<=hi+1e-9*ms;v+=ms) if(!majors.some(u=>Math.abs(u-v)<ms/2)) minors.push(v);
+  return {majors, minors, step};
+}
+function logTicks(lo, hi){        // lo,hi in log10 space (floats ok)
+  const majors=[], minors=[];
+  for(let e=Math.ceil(lo); e<=Math.floor(hi); e++) majors.push(e);        // decade exponents
+  for(let e=Math.floor(lo); e<=Math.floor(hi); e++)
+    for(let m=2;m<=9;m++){ const v=e+Math.log10(m); if(v>lo&&v<hi) minors.push(v); }
+  return {majors, minors};
+}
+
+/* step-aware tick formatter: 0.35 never prints 0.34999999 */
+function fmtTick(v, step){
+  if(v===0) return '0';
+  const a=Math.abs(v);
+  if(a>=1e4 || a<1e-3){ let n=Math.floor(Math.log10(a)), m;
+    if(step!=null&&step>0){
+      // step encodes the required resolution: 4.796e22 and 4.797e22 must differ
+      const d=Math.min(12,Math.max(0, n-Math.floor(Math.log10(step)+1e-9)));
+      m=parseFloat((v/10**n).toFixed(d));
+    } else m=parseFloat((v/10**n).toPrecision(3));
+    if(Math.abs(m)>=10){ m=parseFloat((m/10).toPrecision(12)); n++; }
+    return (m===1?'':m+'×')+'10'+sup(n); }
+  if(step!=null){
+    let d=Math.max(0, -Math.floor(Math.log10(step)+1e-9));
+    while(d<6 && Math.abs(step*10**d-Math.round(step*10**d))>1e-6) d++;   // 0.25-steps need 2 dp
+    return v.toFixed(d);
+  }
+  return String(parseFloat(v.toPrecision(4)));
+}
+const fmt=v=>fmtTick(v);   // legacy alias for non-chart display strings
+
+/* publication frame: full box, inward ticks on all four sides, labels bottom+left,
+   axis titles (x centered at panel bottom, y rotated at canvas left edge).
+   fr={x,y,w,h}; ax={x:{ticks,minors,labelTicks?,pos,label,fmt}, y:{...}} */
+function drawFrame(g, fr, ax, W, H){
+  g.strokeStyle=INKa(.45); g.lineWidth=1;
+  g.strokeRect(fr.x+.5, fr.y+.5, fr.w-1, fr.h-1);
+  const inb=(vals,len,horiz)=>{ (vals||[]).forEach(v=>{
+    if(horiz){ const px=Math.round(ax.x.pos(v))+.5; if(px<fr.x||px>fr.x+fr.w) return;
+      g.beginPath(); g.moveTo(px,fr.y+fr.h-1); g.lineTo(px,fr.y+fr.h-1-len); g.stroke();
+      g.beginPath(); g.moveTo(px,fr.y+1); g.lineTo(px,fr.y+1+len); g.stroke();
+    } else { const py=Math.round(ax.y.pos(v))+.5; if(py<fr.y||py>fr.y+fr.h) return;
+      g.beginPath(); g.moveTo(fr.x+1,py); g.lineTo(fr.x+1+len,py); g.stroke();
+      g.beginPath(); g.moveTo(fr.x+fr.w-1,py); g.lineTo(fr.x+fr.w-1-len,py); g.stroke(); } }); };
+  inb(ax.x.ticks,4,true);  inb(ax.x.minors,2.5,true);
+  inb(ax.y.ticks,4,false); inb(ax.y.minors,2.5,false);
+  g.fillStyle=INKa(.62); g.font='9px '+monoStack();
+  const xf=ax.x.fmt||String, yf=ax.y.fmt||String;
+  g.textAlign='center'; g.textBaseline='top';
+  (ax.x.labelTicks||ax.x.ticks||[]).forEach(v=>{ const px=ax.x.pos(v);
+    if(px<fr.x-2||px>fr.x+fr.w+2) return; g.fillText(xf(v), px, fr.y+fr.h+4); });
+  g.textAlign='right'; g.textBaseline='middle';
+  (ax.y.labelTicks||ax.y.ticks||[]).forEach(v=>{ const py=ax.y.pos(v);
+    if(py<fr.y-2||py>fr.y+fr.h+2) return; g.fillText(yf(v), fr.x-5, py); });
+  g.fillStyle=INK; g.font='9.5px '+monoStack();
+  if(ax.x.label){ g.textAlign='center'; g.textBaseline='alphabetic'; g.fillText(ax.x.label, fr.x+fr.w/2, H-4); }
+  if(ax.y.label){ g.save(); g.translate(10, fr.y+fr.h/2); g.rotate(-Math.PI/2);
+    g.textAlign='center'; g.textBaseline='middle'; g.fillText(ax.y.label,0,0); g.restore(); }
+  g.textBaseline='alphabetic';
+}
+
+/* phase strip: 9px band inside the frame top, contiguous phase-group segments */
+const STRIP_LAB={ice:'Ih', hpice:'HP', ocean:'OCEAN', mantle:'SIL', core:'Fe'};
+function phaseStrip(g, fr, phase, r_km, X, h){
+  let s0=0;
+  for(let i=1;i<=phase.length;i++){
+    if(i===phase.length||grpId(phase[i])!==grpId(phase[s0])){
+      const x0=X(r_km[s0]), x1=X(r_km[Math.min(i,r_km.length-1)]);
+      const grp=grpId(phase[s0]);
+      g.fillStyle=hexA(GRP_COLOR[grp]||'#B9AE9E', grp==='core'?0.25:0.5);
+      g.fillRect(x0, fr.y+1, x1-x0, h-1);
+      if(x1-x0>=20){ g.fillStyle=INKa(.75); g.font='700 7.5px '+dispStack();
+        g.textAlign='center'; g.textBaseline='middle';
+        g.fillText(STRIP_LAB[grp]||'', (x0+x1)/2, fr.y+h/2+0.5); }
+      s0=i;
+    }
+  }
+  g.strokeStyle=INKa(.25); g.lineWidth=1;
+  g.beginPath(); g.moveTo(fr.x+1, fr.y+h+.5); g.lineTo(fr.x+fr.w-1, fr.y+h+.5); g.stroke();
+  g.textBaseline='alphabetic';
+}
+
+/* marching squares over a value callback; returns line segments per level */
+function marchSegs(val, nx, ny, lev, cx, cy){
+  const segs=[];
+  for(let i=0;i<nx-1;i++)for(let j=0;j<ny-1;j++){
+    const a=val(i,j),b=val(i+1,j),c=val(i+1,j+1),d=val(i,j+1);
+    if(a==null||b==null||c==null||d==null) continue;
+    const pts=[]; const edge=(v1,v2,x1,y1,x2,y2)=>{ if((v1<lev)!==(v2<lev)){ const t=(lev-v1)/((v2-v1)||1); pts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]); } };
+    const xi=cx(i),xi1=cx(i+1),yj=cy(j),yj1=cy(j+1);
+    edge(a,b,xi,yj,xi1,yj); edge(b,c,xi1,yj,xi1,yj1); edge(c,d,xi1,yj1,xi,yj1); edge(d,a,xi,yj1,xi,yj);
+    if(pts.length>=2) segs.push([pts[0],pts[1]]);
+  }
+  return segs;
+}
+
+/* Radial-Plate line chart over physical radius: series[{y,color,w,label}],
+   series index i plots at o.r_km[i] (r_km may be N+1 boundary values).
+   x axis reversed: surface (R) left -> center (0) right. */
+function plotXY(cv, o, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,240,216);
+  const pl=46, pr=8, pt=6, pb=30;
+  const fr={x:pl, y:pt, w:W-pl-pr, h:H-pt-pb};
   const vals=o.series.flatMap(s=>s.y).filter(v=>isFinite(v)&&(!o.ylog||v>0));
   if(!vals.length){ note(g,W,H,'—'); return; }
   let lo=Math.min(...vals), hi=Math.max(...vals);
-  if(o.ylog){ lo=Math.floor(Math.log10(lo)); hi=Math.ceil(Math.log10(hi)); if(hi<=lo) hi=lo+1; }
-  else { if(hi===lo){hi=lo+1;} const m=(hi-lo)*0.06; lo-=m; hi+=m; }
-  const X=xf=>pl+xf*IW, Y=v=>{ const t=o.ylog?Math.log10(Math.max(v,1e-300)):v; return pt+IH-((t-lo)/((hi-lo)||1))*IH; };
-  if(o.phase){ let s0=0; for(let i=1;i<=o.phase.length;i++){ if(i===o.phase.length||grpId(o.phase[i])!==grpId(o.phase[s0])){
-    g.fillStyle=grpTintOf(o.phase[s0]); g.fillRect(X(o.xf[s0]),pt,X(o.xf[i-1])-X(o.xf[s0])+1,IH); s0=i; } } }
-  g.strokeStyle=INKa(.16); g.lineWidth=1; g.strokeRect(pl+.5,pt+.5,IW-1,IH-1);
+  let yTicks, yMinors=[], yLabelTicks=null, yFmt, yStep=null;
+  if(o.ylog){
+    const llo=Math.log10(lo), lhi=Math.log10(hi);
+    lo=Math.floor(llo); hi=Math.ceil(lhi);
+    if(llo-lo<1e-9) lo-=1;   // data exactly on a decade would sit on the frame line:
+    if(hi-lhi<1e-9) hi+=1;   // pad one decade so the series stays visible
+    if(hi<=lo) hi=lo+1;
+    const t=logTicks(lo,hi); yTicks=t.majors;
+    if(fr.h/(hi-lo)>=18) yMinors=t.minors;
+    if(hi-lo>6){ const ev=Math.ceil((hi-lo)/6); yLabelTicks=t.majors.filter(e=>e%ev===0); }
+    yFmt=e=>'10'+sup(e);
+  } else {
+    if(hi===lo) hi=lo+1; const m=(hi-lo)*0.06; lo-=m; hi+=m;
+    const t=linTicks(lo,hi,5); yTicks=t.majors; yMinors=t.minors; yStep=t.step;
+    yFmt=v=>fmtTick(v,yStep);
+  }
+  const R=o.R_km, r=o.r_km;
+  const X=v=>fr.x+(1-v/R)*fr.w;
+  const Yv=v=>{ const t=o.ylog?Math.log10(Math.max(v,1e-300)):v; return fr.y+fr.h-((t-lo)/((hi-lo)||1))*fr.h; };
+  const Yt=v=>fr.y+fr.h-((v-lo)/((hi-lo)||1))*fr.h;   // tick position (log ticks are exponents)
+  // phase tint below the strip + the strip itself
+  const stripH=9;
+  if(o.phase&&o.phase.length){
+    let s0=0;
+    for(let i=1;i<=o.phase.length;i++){
+      if(i===o.phase.length||grpId(o.phase[i])!==grpId(o.phase[s0])){
+        const x0=X(r[s0]), x1=X(r[Math.min(i,r.length-1)]);
+        g.fillStyle=grpTintOf(o.phase[s0]);
+        g.fillRect(x0, fr.y+stripH+1, x1-x0+1, fr.h-stripH-1);
+        s0=i;
+      }
+    }
+    phaseStrip(g, fr, o.phase, r, X, stripH);
+  }
+  // series
+  g.save(); g.beginPath(); g.rect(fr.x,fr.y,fr.w,fr.h); g.clip();
   o.series.forEach(s=>{ g.beginPath(); let started=false;
     for(let i=0;i<s.y.length;i++){ const v=s.y[i]; if(!isFinite(v)||(o.ylog&&v<=0)){started=false;continue;}
-      const px=X(o.xf[i]), py=Y(v); started?g.lineTo(px,py):g.moveTo(px,py); started=true; }
+      const px=X(r[i]), py=Yv(v); started?g.lineTo(px,py):g.moveTo(px,py); started=true; }
     g.strokeStyle=s.color||INK; g.lineWidth=s.w||1.5; g.stroke(); });
-  const yl=v=>o.ylog?('10'+sup(v)):fmt(v);
-  g.fillStyle=INKa(.55); g.font='9px '+monoStack(); g.textAlign='right'; g.textBaseline='alphabetic';
-  g.fillText(yl(hi), pl-4, pt+8); g.fillText(yl(lo), pl-4, pt+IH-1);
-  g.textAlign='left'; g.fillStyle=INKa(.38); g.fillText('surf', pl+1, H-4);
-  g.textAlign='right'; g.fillText('center', W-pr, H-4);
-  if(o.series.length>1){ let lx=pl+4; g.textBaseline='middle';
-    o.series.forEach(s=>{ g.fillStyle=s.color||INK; g.fillRect(lx,pt+6,10,2.5);
-      g.font='8.5px '+monoStack(); g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(s.label||'',lx+13,pt+7);
-      lx+=13+(s.label||'').length*5.4+10; }); g.textBaseline='alphabetic'; }
+  g.restore();
+  // frame + ticks + titles
+  const xt=linTicks(0,R,5);
+  drawFrame(g, fr, {
+    x:{ticks:xt.majors, minors:xt.minors, pos:X, label:'r (km)', fmt:v=>fmtTick(v,xt.step)},
+    y:{ticks:yTicks, minors:yMinors, labelTicks:yLabelTicks, pos:Yt, label:o.ylab||'', fmt:yFmt},
+  }, W, H);
+  // legend: top-right inside the frame, below the phase strip
+  if(o.series.length>1){
+    g.font='8.5px '+monoStack(); g.textBaseline='middle';
+    const items=o.series.map(s=>({c:s.color||INK, t:s.label||''}));
+    const tw=items.reduce((s,it)=>s+13+g.measureText(it.t).width+9,0);
+    let lx=fr.x+fr.w-4-tw; const ly=fr.y+stripH+10;
+    items.forEach(it=>{ g.fillStyle=it.c; g.fillRect(lx,ly-1.2,10,2.5);
+      g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(it.t,lx+13,ly);
+      lx+=13+g.measureText(it.t).width+9; });
+    g.textBaseline='alphabetic';
+  }
 }
 function note(g,W,H,t){ g.fillStyle=INKa(.4); g.font='10px '+monoStack(); g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,W/2,H/2); g.textAlign='left'; g.textBaseline='alphabetic'; }
 
-/* Tidal Love numbers as amplitude bars (+ libration / phase). */
-function drawGravity(cv, model){
-  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||240,H=box.clientHeight||140; cv.width=W*dpr;cv.height=H*dpr;
-  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+/* Tidal Love numbers: amplitude bars on a real axis, per-row |amp| ∠phase. */
+const degStr=v=>String(+(+v).toPrecision(2)).replace('-','−');
+function drawGravity(cv, model, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,360,216);
   const G=model.grav; if(!G){ note(g,W,H,'enable Compute'); return; }
   const amp=(c,f)=>G[f]!=null?G[f]:(c&&c.re!=null?Math.hypot(c.re,c.im||0):null);
-  const rows=[['k₂',amp(G.k,'kAmp')],['h₂',amp(G.h,'hAmp')],['l₂',amp(G.l,'lAmp')]].filter(r=>r[1]!=null);
-  const max=1.4, pl=34, pr=54, IW=W-pl-pr, top=12, rh=(H-28)/(rows.length||1);
-  rows.forEach((r,i)=>{ const y=top+i*rh+rh/2, w=Math.min(1,r[1]/max)*IW;
-    g.fillStyle=INKa(.10); g.fillRect(pl,y-6,IW,12);
-    g.fillStyle=i===0?'#6E92A8':INK; g.fillRect(pl,y-6,w,12);
-    g.fillStyle=INK; g.font='700 11px '+dispStack(); g.textAlign='right'; g.textBaseline='middle'; g.fillText(r[0],pl-6,y);
-    g.font='12px '+monoStack(); g.textAlign='left'; g.fillStyle=i===0?'#E4322B':INK; g.fillText((+r[1]).toFixed(3),pl+w+6,y); });
-  g.textBaseline='alphabetic'; g.fillStyle=INKa(.5); g.font='9px '+monoStack(); g.textAlign='left';
-  g.fillText('libration '+(G.libration_m!=null?Math.round(G.libration_m)+' m':'—')+(G.kPhase!=null?'   δk₂ '+(+G.kPhase).toFixed(1)+'°':''), pl, H-4);
+  const rows=[['k₂',amp(G.k,'kAmp'),G.kPhase],['h₂',amp(G.h,'hAmp'),G.hPhase],
+              ['l₂',amp(G.l,'lAmp'),G.lPhase],['δ',amp(G.delta,'deltaAmp'),G.deltaPhase]]
+    .filter(r=>r[1]!=null);
+  if(!rows.length){ note(g,W,H,'—'); return; }
+  const pl=30, pr=8, pt=6, pb=30;
+  const fr={x:pl, y:pt, w:W-pl-pr, h:H-pt-pb};
+  const maxAmp=Math.max(...rows.map(r=>r[1]));
+  const st=niceStep(maxAmp||1,4), xmax=st*Math.ceil((maxAmp||1)/st);
+  const t=linTicks(0,xmax,4);
+  const X=v=>fr.x+(v/xmax)*fr.w;
+  const inTop=6, inBot=16, rh=(fr.h-inTop-inBot)/rows.length;
+  rows.forEach((r,i)=>{
+    const y=fr.y+inTop+i*rh+rh/2, w=(r[1]/xmax)*fr.w;
+    g.fillStyle=INKa(.10); g.fillRect(fr.x, y-6, fr.w, 12);
+    g.fillStyle=i===0?'#6E92A8':INK; g.fillRect(fr.x, y-6, w, 12);
+    g.fillStyle=INK; g.font='700 11px '+dispStack(); g.textAlign='right'; g.textBaseline='middle';
+    g.fillText(r[0], fr.x-6, y);
+    const txt=fmtTick(r[1])+(r[2]!=null?' ∠'+degStr(r[2])+'°':'');
+    g.font='10.5px '+monoStack();
+    if(fr.x+w+6+g.measureText(txt).width<=fr.x+fr.w-3){
+      g.textAlign='left'; g.fillStyle=INK; g.fillText(txt, fr.x+w+6, y);
+    } else { g.textAlign='right'; g.fillStyle='#FFFFFF'; g.fillText(txt, fr.x+w-6, y); }
+  });
+  g.textBaseline='alphabetic';
+  drawFrame(g, fr, {
+    x:{ticks:t.majors, minors:t.minors, pos:X, label:'|Love number| (–)', fmt:v=>fmtTick(v,t.step)},
+    y:{ticks:[], minors:[], pos:v=>v, label:'', fmt:String},
+  }, W, H);
+  const foot=[];
+  if(G.libration_m!=null) foot.push('libration '+Math.round(G.libration_m)+' m');
+  if(G.Torb_s!=null) foot.push('T_orb '+(G.Torb_s/3600).toFixed(1)+' hr');
+  if(foot.length){ g.fillStyle=INKa(.55); g.font='9px '+monoStack(); g.textAlign='left';
+    g.fillText(foot.join(' · '), fr.x+5, fr.y+fr.h-5); }
 }
 
-/* Induced magnetic response: amplitude stems vs excitation period (log hr), phase annotated. */
-function drawInduction(cv, model){
-  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||240,H=box.clientHeight||140; cv.width=W*dpr;cv.height=H*dpr;
-  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+/* Induced magnetic response: |Aₑ| stems vs excitation period on a log-hr axis,
+   top-4 amplitudes annotated (label + phase) with collision suppression. */
+function drawInduction(cv, model, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,360,216);
   const I=model.induct; if(!I||!I.Amp||!I.Amp.length){ note(g,W,H,'enable Compute'); return; }
   const per=I.Texc_hr, amp=I.Amp, ph=I.phase||[], lab=I.calcedExc||[];
-  const pl=34,pr=10,pt=12,pb=26,IW=W-pl-pr,IH=H-pt-pb;
+  const pl=46, pr=8, pt=6, pb=30;
+  const fr={x:pl, y:pt, w:W-pl-pr, h:H-pt-pb};
   const lx=Math.log10(Math.min(...per)*0.8), hx=Math.log10(Math.max(...per)*1.3);
-  const X=p=>pl+(Math.log10(p)-lx)/((hx-lx)||1)*IW, Y=a=>pt+IH-Math.min(1,a)*IH;
-  g.strokeStyle=INKa(.16); g.lineWidth=1; g.strokeRect(pl+.5,pt+.5,IW-1,IH-1);
+  const X=p=>fr.x+(Math.log10(p)-lx)/((hx-lx)||1)*fr.w;
+  const Xe=e=>fr.x+(e-lx)/((hx-lx)||1)*fr.w;
+  const Y=a=>fr.y+fr.h-Math.max(0,Math.min(1,a))*fr.h;
+  const iMax=amp.indexOf(Math.max(...amp));
   per.forEach((p,i)=>{ const x=X(p), y=Y(amp[i]);
-    g.strokeStyle=i===0?'#6E92A8':INKa(.7); g.lineWidth=i===0?2:1.4; g.beginPath(); g.moveTo(x,pt+IH); g.lineTo(x,y); g.stroke();
-    g.fillStyle=i===0?'#6E92A8':INK; g.beginPath(); g.arc(x,y,2.6,0,7); g.fill();
-    g.fillStyle=INKa(.55); g.font='8px '+monoStack(); g.textAlign='center';
-    g.fillText((lab[i]||'').slice(0,4).toUpperCase(),x,pt+IH+11);
-    g.fillText(ph[i]!=null?Math.round(ph[i])+'°':'',x,pt+IH+21); });
-  g.fillStyle=INKa(.55); g.font='9px '+monoStack(); g.textAlign='right'; g.fillText('1.0',pl-3,pt+8); g.fillText('0',pl-3,pt+IH);
-  g.textAlign='left'; g.fillStyle=INKa(.38); g.fillText('period →',pl+1,H-3);
+    g.strokeStyle=i===iMax?'#6E92A8':INKa(.7); g.lineWidth=i===iMax?2:1.4;
+    g.beginPath(); g.moveTo(x,fr.y+fr.h-1); g.lineTo(x,y); g.stroke();
+    g.fillStyle=i===iMax?'#6E92A8':INK; g.beginPath(); g.arc(x,y,2.6,0,2*Math.PI); g.fill(); });
+  // annotations: sorted by amplitude desc, top 4, suppressed within 22px
+  const order=per.map((_,i)=>i).sort((a,b)=>amp[b]-amp[a]);
+  const placed=[]; let nAnn=0;
+  g.font='8px '+monoStack();
+  for(const i of order){
+    if(nAnn>=4) break;
+    const x=X(per[i]), y=Y(amp[i]);
+    const l1=(lab[i]||'').slice(0,7).toUpperCase();
+    const l2=ph[i]!=null?('φ '+String(Math.round(ph[i])).replace('-','−')+'°'):'';
+    const wtxt=Math.max(g.measureText(l1).width,g.measureText(l2).width);
+    if(placed.some(p=>Math.hypot(p[0]-x,p[1]-y)<22 ||
+       (Math.abs(p[1]-y)<20 && Math.abs(p[0]-x)<wtxt+12))) continue;
+    let tx=x+6, alignL=true;
+    if(tx+wtxt>fr.x+fr.w-3){ tx=x-6; alignL=false; }
+    const ty=Math.max(fr.y+18,y-2);
+    g.textAlign=alignL?'left':'right';
+    g.lineWidth=3; g.strokeStyle=opts.export?'#FFFFFF':'#FCFCFB';
+    g.strokeText(l1,tx,ty); if(l2) g.strokeText(l2,tx,ty+9);
+    g.fillStyle=INKa(.8); g.fillText(l1,tx,ty);
+    if(l2){ g.fillStyle=INKa(.55); g.fillText(l2,tx,ty+9); }
+    placed.push([x,y]); nAnn++;
+  }
+  const xt=logTicks(lx,hx), yt=linTicks(0,1,5);
+  drawFrame(g, fr, {
+    x:{ticks:xt.majors, minors:(fr.w/((hx-lx)||1)>=18)?xt.minors:[], pos:Xe, label:'T_exc (hr)', fmt:e=>'10'+sup(e)},
+    y:{ticks:yt.majors, minors:yt.minors, pos:v=>fr.y+fr.h-v*fr.h, label:'|Aₑ| (–)', fmt:v=>fmtTick(v,yt.step)},
+  }, W, H);
 }
 
 /* which figures exist, grouped into sections */
 const SECTIONS=[
- {name:'Structure', charts:[
+ {name:'Structure', id:'structure', charts:[
    {t:'Density',u:'kg/m³',key:'rho_kgm3'}, {t:'Gravity',u:'m/s²',key:'g_ms2'}, {t:'Pressure',u:'MPa',key:'P_MPa'} ]},
- {name:'Thermodynamics', charts:[
+ {name:'Thermodynamics', id:'thermodynamics', charts:[
    {t:'Temperature',u:'K',key:'T_K',color:'#6E92A8'}, {t:'Heat capacity',u:'J/kg/K',key:'Cp_JkgK'},
    {t:'Expansivity',u:'1/K',key:'alpha_pK'}, {t:'Thermal cond.',u:'W/m/K',key:'kTherm_WmK'},
    {t:'Viscosity',u:'Pa·s',key:'eta_Pas',log:true}, {t:'Tidal heating',u:'W/m³',key:'Htidal_Wm3',log:true} ]},
- {name:'Seismic', charts:[
-   {t:'Sound speeds',u:'km/s',multi:[['VP_kms',INK,'Vp'],['VS_kms','#6E92A8','Vs']]},
+ {name:'Seismic', id:'seismic', charts:[
+   {t:'Sound speeds',u:'km/s',yl:'V (km s⁻¹)',multi:[['VP_kms',INK,'Vp'],['VS_kms','#6E92A8','Vs']]},
    {t:'Attenuation Q_S',u:'',key:'QS',log:true},
-   {t:'Elastic moduli',u:'GPa',multi:[['KS_GPa',INK,'Ks'],['GS_GPa','#6E92A8','Gs']]} ]},
- {name:'Electrical', charts:[
+   {t:'Elastic moduli',u:'GPa',yl:'M (GPa)',multi:[['KS_GPa',INK,'Ks'],['GS_GPa','#6E92A8','Gs']]} ]},
+ {name:'Electrical', id:'electrical', charts:[
    {t:'Conductivity',u:'S/m',key:'sigma_Sm',log:true}, {t:'Porosity',u:'void frac',key:'phi_frac'} ]},
- {name:'Gravity & tides', charts:[ {t:'Tidal Love numbers',u:'amplitude',special:'gravity'} ]},
- {name:'Magnetic induction', charts:[ {t:'Induced response Aₑ',u:'|Aₑ| vs period',special:'induction'} ]},
+ {name:'Gravity & tides', id:'gravity', charts:[ {t:'Tidal Love numbers',u:'amplitude',special:'gravity'} ]},
+ {name:'Magnetic induction', id:'induction', charts:[ {t:'Induced response Aₑ',u:'|Aₑ| vs period',special:'induction'} ]},
 ];
 function hasData(model, c){
   if(c.special==='gravity') return !!model.grav;
@@ -729,20 +944,28 @@ function hasData(model, c){
 }
 function renderCharts(model){
   const host=$('#figures'); if(!host) return;
+  SECTIONS.forEach(sec=>{ figRegistry[sec.id]=[]; });
   const jobs=[]; let html='', id=0;
   SECTIONS.forEach(sec=>{ const chs=sec.charts.filter(c=>hasData(model,c)); if(!chs.length) return;
-    html+=`<div class="fsec"><div class="fhead">${sec.name}</div><div class="fgrid">`;
+    html+=`<div class="fsec"><div class="fhead">${sec.name}${exBtnsHTML(sec.id)}</div><div class="fgrid">`;
     chs.forEach(c=>{ html+=`<figure class="fig"><figcaption><span class="ft">${c.t}</span><span class="fu">${c.u}</span></figcaption>`
-      +`<div class="figbox"><canvas data-id="${id}"></canvas></div></figure>`; jobs.push({id,c}); id++; });
+      +`<div class="figbox"><canvas data-id="${id}"></canvas></div></figure>`; jobs.push({id,c,secId:sec.id}); id++; });
     html+='</div></div>';
   });
   host.innerHTML=html;
-  jobs.forEach(({id,c})=>{ const cv=host.querySelector(`canvas[data-id="${id}"]`); if(!cv) return;
-    if(c.special==='gravity') drawGravity(cv,model);
-    else if(c.special==='induction') drawInduction(cv,model);
+  const r_km=model.layers.r_m.map(v=>v/1000), R_km=model.R_m/1000;
+  jobs.forEach(({id,c,secId})=>{ const cv=host.querySelector(`canvas[data-id="${id}"]`); if(!cv) return;
+    let draw;
+    if(c.special==='gravity') draw=(cv2,o={})=>drawGravity(cv2,model,o);
+    else if(c.special==='induction') draw=(cv2,o={})=>drawInduction(cv2,model,o);
     else{ const series=c.multi ? c.multi.filter(m=>model.layers[m[0]]).map(m=>({y:model.layers[m[0]],color:m[1],label:m[2]}))
                                : [{y:model.layers[c.key],color:c.color||INK}];
-      plotXY(cv,{xf:xfOf(model),phase:model.layers.phase,series,ylog:c.log}); } });
+      const data={r_km,R_km,phase:model.layers.phase,series,ylog:c.log,
+                  ylab:c.yl||(c.key?axLabel(c.key):'')};
+      draw=(cv2,o={})=>plotXY(cv2,data,o); }
+    draw(cv);
+    regFig(secId, slug(c.t), 360, 216, draw); });
+  syncExportButtons();
 }
 
 /* -------------------------------------------------------------- render all */
@@ -750,6 +973,12 @@ function render(model, animate){
   current=model;
   $('#bodyName').firstChild.textContent=(model.name||'Europa')+' ';
   $('#bodyR').textContent='R '+(model.R_m/1000).toFixed(1)+' km';
+  // export registry: plate + all three profile quantities (not just the active chip)
+  figRegistry.interior=[];
+  regFig('interior','plate',900,600,(cv,o={})=>{ const hg=hoverGroup; hoverGroup=null;
+    try{ drawCut(model,1,Object.assign({},o,{cv})); } finally{ hoverGroup=hg; } });
+  [['profile-rho','rho_kgm3'],['profile-t','T_K'],['profile-p','P_MPa']].forEach(([nm,k])=>
+    regFig('interior',nm,520,216,(cv,o={})=>profChart(cv,model,k,o)));
   renderMeta(model); drawProf(model); renderCharts(model);
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
   if(animate && !reduce){
@@ -800,29 +1029,68 @@ async function probe(url, token){
 }
 function setStatus(s, text){ const c=$('#statusChip'); c.dataset.s=s; $('#statusText').textContent=text; }
 
-async function compute(){
-  const btn=$('#run'), rl=$('#run .rl');
+/* ---- one button, four concurrent report jobs (server has 4 workers) ---- */
+const cloneSpec=o=>JSON.parse(JSON.stringify(o));
+function setSecStatus(sel, s, msg){
+  const el=$(sel); if(!el) return;
+  if(s){ el.dataset.s=s; } else { delete el.dataset.s; }
+  el.textContent = s==='queued' ? '· queued'
+                 : s==='running' ? '· running'
+                 : s==='done' ? '· done'
+                 : s==='error' ? ('· '+String(msg||'failed').slice(0,60)) : '';
+}
+async function runToResult(spec, mark){
+  const sub=await (await api('/runs',{method:'POST',body:JSON.stringify(spec)})).json();
+  if(!sub.id) throw new Error((sub.detail&&sub.detail[0]&&sub.detail[0].message)||'rejected');
+  await streamRun(sub.id, mark);
+  return (await api('/runs/'+sub.id+'/result')).json();
+}
+async function generateReport(){
   if(!validateTri()) return;
   if(!backend){ openModal(); return; }
-  btn.disabled=true; btn.classList.add('running'); rl.textContent='Computing';
-  setStatus('busy','computing'); showRail();
+  const btn=$('#run'), rl=$('#run .rl');
+  btn.disabled=true; btn.classList.add('running'); rl.textContent='Generating';
+  clearStale(); setStatus('busy','generating');
+  ['#stSingle','#stExplore','#stInduct','#stInfer'].forEach(s=>setSecStatus(s,'queued'));
+  const spec=await buildSpec();
+  lastSpec=cloneSpec(spec);         // captured for the export manifest (never contains the token)
+  await Promise.allSettled([
+    runSingle(cloneSpec(spec)),
+    runExplore(cloneSpec(spec)),
+    runInduct(cloneSpec(spec)),
+    runInference()
+  ]);
+  setStatus('live','connected · PyALMA3');
+  btn.disabled=false; btn.classList.remove('running'); rl.textContent='Generate report';
+}
+async function runSingle(spec){
+  setSecStatus('#stSingle','running'); showRail();
   try{
-    const sub=await (await api('/runs',{method:'POST',body:JSON.stringify(await buildSpec())})).json();
-    if(!sub.id){ throw new Error((sub.detail&&sub.detail[0]&&sub.detail[0].message)||'rejected'); }
-    await streamRun(sub.id);
-    const res=await (await api('/runs/'+sub.id+'/result')).json();
+    let res, errMsg;
+    // Retry transient engine failures (a flaky pooled worker can fail a spec that
+    // succeeds verbatim on resubmission); a genuinely invalid model (valid:false
+    // with no error payload) won't change on resubmission, so don't retry those.
+    for(let attempt=0; attempt<3; attempt++){
+      if(attempt) showRail();
+      res=await runToResult(cloneSpec(spec), true);
+      if(res.meta && res.meta.valid) break;
+      const engineErr=res.error && res.error.message;
+      errMsg=engineErr || (res.meta&&res.meta.invalidReason) || 'no valid solution';
+      if(!engineErr) break;
+    }
     if(res.meta && res.meta.valid){
+      lastResults.single=res;       // raw JSON kept for data export / raw bundle
       const m=fromResult(res, $('#body').value); render(m,true);
       $('#prov').textContent='live · '+($('#body').value); $('#engine').textContent='engine '+(backend.version||'live');
-    } else { throw new Error('model invalid: '+(res.meta&&res.meta.invalidReason||'no valid solution')); }
-    setStatus('live','connected · PyALMA3');
-  }catch(e){ setStatus('live','connected · PyALMA3'); flashNote(e.message||'compute failed'); }
-  finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Compute'; hideRail(); }
+      setSecStatus('#stSingle','done');
+    } else { throw new Error(errMsg); }
+  }catch(e){ setSecStatus('#stSingle','error', e.message); }
+  finally{ hideRail(); }
 }
-async function streamRun(id){
+async function streamRun(id, mark){
   return new Promise((resolve)=>{
     const es=new EventSource(backend.url+'/runs/'+id+'/events?token='+encodeURIComponent(backend.token));
-    es.onmessage=ev=>{ try{ const m=JSON.parse(ev.data); markRail(m.stage||m.status); if(m.terminal){ es.close(); resolve(); } }catch(_){} };
+    es.onmessage=ev=>{ try{ const m=JSON.parse(ev.data); if(mark) markRail(m.stage||m.status); if(m.terminal){ es.close(); resolve(); } }catch(_){} };
     es.onerror=()=>{ es.close(); resolve(); };
   });
 }
@@ -855,7 +1123,10 @@ function markRail(stage){ if(!stage) return; const rail=$('#rail'); let hit=fals
     else if(!hit) el.className='st done'; });
 }
 function hideRail(){ setTimeout(()=>$('#rail').classList.remove('show'),400); }
-function flashNote(msg){ const n=$('#triNote'); n.className='tri-note err'; n.textContent=String(msg).slice(0,60); setTimeout(validateTri,3200); }
+
+/* stale marker: input changes never auto-run — they just flag the report */
+function markStale(){ const n=$('#staleNote'); if(n) n.hidden=false; }
+function clearStale(){ const n=$('#staleNote'); if(n) n.hidden=true; }
 
 /* ------------------------------------------------------------------- modal */
 function openModal(){ $('#modal').classList.add('show'); $('#tok').focus(); }
@@ -877,7 +1148,27 @@ function initBody(){ const sel=$('#body'); sel.innerHTML=Object.keys(SAMPLES).ma
 function loadSample(){ const b=$('#body').value; const m=SAMPLES[b]||SAMPLES.Europa; m.name=b; render(m,true);
   $('#prov').textContent = backend?'sample · not yet computed':'sample model'; }
 
-$('#body').addEventListener('change', loadSample);
+/* body switch invalidates every computed report section: drop the previous body's
+   live results, spec, sweeps, and posterior so exports can never mix the old body's
+   data (filenames + manifest read the NEW select value at export time). */
+function resetReportState(){
+  lastResults.single=null; lastSpec=null;
+  exploreState=null; inductState=null;
+  infState=null; curArt=null;
+  ['#stSingle','#stExplore','#stInduct','#stInfer'].forEach(s=>setSecStatus(s,null));
+  const of=$('#obsForm'); if(of) of.innerHTML='';
+  const st=$('#summTab'); if(st) st.innerHTML='';
+  renderGuards(null,null);
+  const sc=$('#infScope'); if(sc) sc.hidden=true;
+  const nn=$('#infNone'); if(nn) nn.hidden=true;
+  drawCorner($('#corner'),null);
+  figRegistry.inference=[];
+  repaintExplore(); repaintInduct();   // null states: empty panels, clears figRegistry.sweeps
+}
+$('#body').addEventListener('change', ()=>{ resetReportState(); loadSample(); markStale(); });
+$('#ocean').addEventListener('change', markStale);
+$('#core').addEventListener('change', markStale);
+$$('.con .val input').forEach(el=> el.addEventListener('input', markStale));
 
 /* two-of-three: exactly two active; clicking a third deselects the oldest */
 let conOrder=['Tb','w'];   // default: temperature + salinity (the engine needs salinity set)
@@ -888,12 +1179,12 @@ $$('#tri .con').forEach(c=>{
     const k=c.dataset.k;
     if(conOrder.includes(k)) return;   // keep exactly two selected
     conOrder.push(k); conOrder.shift(); // drop the oldest
-    syncTri();
+    syncTri(); markStale();
   });
 });
 
 $$('#chips .chip').forEach(ch=> ch.onclick=()=>{ $$('#chips .chip').forEach(x=>x.classList.remove('on')); ch.classList.add('on'); profQ=ch.dataset.q; if(current) drawProf(current); });
-$('#run').onclick=compute;
+$('#run').onclick=generateReport;
 
 /* canvas hover -> highlight band + echo readout row */
 (function(){
@@ -912,20 +1203,20 @@ $('#run').onclick=compute;
 })();
 
 let _rt; addEventListener('resize', ()=>{ if(current){ drawCut(current,1); drawProf(current); }
-  clearTimeout(_rt); _rt=setTimeout(()=>{ if(current) renderCharts(current); repaintHeat(); if(infState) drawCorner($('#corner'),infState); },120); });
+  clearTimeout(_rt); _rt=setTimeout(()=>{ if(current) renderCharts(current); repaintExplore(); repaintInduct(); if(infState) drawCorner($('#corner'),infState); },120); });
 addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
-/* ============================================================ ADVANCED TOOLS
-   ExploreOgram (2-D sweep heatmap) + amortized Bayesian inference (corner plot).
-   Both talk to the live backend; when disconnected they prompt to connect. */
+/* ====================================================== REPORT: SWEEPS + SBI
+   ExploreOgram + InductOgram heatmaps and amortized Bayesian inference are
+   report sections filled in by generateReport(); the selects only repaint. */
 
 const SWEEP_AXES=[
-  {k:'wOcean_ppt',        lab:'Salinity',       u:'ppt',   r:[1,50]},
-  {k:'Tb_K',              lab:'Ice-base T',     u:'K',     r:[255,270]},
-  {k:'zb_approximate_km', lab:'Ice thickness',  u:'km',    r:[5,40]},
-  {k:'Cmeasured',         lab:'C/MR² target',   u:'',      r:[0.30,0.355]},
-  {k:'silPhi_frac',       lab:'Rock porosity',  u:'frac',  r:[0,0.2]},
-  {k:'Htidal_Wm3',        lab:'Tidal heating',  u:'W/m³',  r:[1e-10,1e-8]},
+  {k:'wOcean_ppt',        lab:'Salinity',       sym:'w_ocean',  u:'ppt',   r:[1,50]},
+  {k:'Tb_K',              lab:'Ice-base T',     sym:'T_b',      u:'K',     r:[255,270]},
+  {k:'zb_approximate_km', lab:'Ice thickness',  sym:'d_ice',    u:'km',    r:[5,40]},
+  {k:'Cmeasured',         lab:'C/MR² target',   sym:'C/MR²',    u:'',      r:[0.30,0.355]},
+  {k:'silPhi_frac',       lab:'Rock porosity',  sym:'φ_sil',    u:'frac',  r:[0,0.2]},
+  {k:'Htidal_Wm3',        lab:'Tidal heating',  sym:'H_tidal',  u:'W/m³',  r:[1e-10,1e-8]},
 ];
 const SWEEP_Z=[
   {k:'D_km',lab:'Ocean thickness',u:'km'},{k:'zb_km',lab:'Ice thickness',u:'km'},
@@ -945,20 +1236,29 @@ function lerpHex(a,b,t){ const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),1
 function ramp(t){ t=Math.max(0,Math.min(1,t));
   return t<0.5 ? lerpHex('#F1F5F6','#6E92A8',t/0.5) : lerpHex('#6E92A8','#22242A',(t-0.5)/0.5); }
 
-let gridState=null;   // last sweep result JSON
+let exploreState=null;   // last ExploreOgram result JSON
+let inductState=null;    // last InductOgram result JSON
 
-function drawHeatmap(cv, res, zKey){
-  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||420,H=box.clientHeight||360; cv.width=W*dpr;cv.height=H*dpr;
-  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
-  if(!res){ note(g,W,H,'run a sweep'); return; }
+/* fractional index of value v in the ascending sample vector vals */
+function idxOf(vals, v){
+  const n=vals.length;
+  if(v<=vals[0]) return 0;
+  if(v>=vals[n-1]) return n-1;
+  for(let i=0;i<n-1;i++) if(v<=vals[i+1]) return i+(v-vals[i])/((vals[i+1]-vals[i])||1);
+  return n-1;
+}
+function drawHeatmap(cv, res, zKey, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,460,356);
+  if(!res){ note(g,W,H,'generate the report'); return; }
   const meta=res.meta, ax=res.axes, Z=res.grid[zKey], V=res.grid.VALID;
   const nx=meta.nx, ny=meta.ny;
-  const pl=52,pr=14,pt=12,pb=34, IW=W-pl-pr, IH=H-pt-pb;
+  const pl=52,pr=58,pt=12,pb=34, IW=W-pl-pr, IH=H-pt-pb;
   const cw=IW/nx, ch=IH/ny;
-  // value range over finite, valid cells
+  // value range over finite, valid cells only (invalid cells are painted as
+  // placeholders and excluded from contours — they must not stretch the scale)
   let lo=Infinity,hi=-Infinity;
-  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){ const v=Z&&Z[i]?Z[i][j]:null; if(v!=null&&isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } }
+  for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){ const v=Z&&Z[i]?Z[i][j]:null, ok=V&&V[i]?V[i][j]:false;
+    if(ok&&v!=null&&isFinite(v)){ if(v<lo)lo=v; if(v>hi)hi=v; } }
   if(!isFinite(lo)){ note(g,W,H,'no valid cells'); return; }
   const span=(hi-lo)||1;
   // cells: i→x (horizontal), j→y (vertical, larger y up)
@@ -969,117 +1269,143 @@ function drawHeatmap(cv, res, zKey){
       g.moveTo(x,y); g.lineTo(x+cw,y+ch); g.stroke(); continue; }
     g.fillStyle=ramp((v-lo)/span); g.fillRect(x,y,cw+.5,ch+.5);
   }
-  // contour overlay (marching squares over cell centres)
-  contours(g, Z, V, nx, ny, lo, hi, (i)=>pl+(i+0.5)*cw, (j)=>pt+(ny-1-j+0.5)*ch);
-  // frame
-  g.strokeStyle=INKa(.28); g.lineWidth=1; g.strokeRect(pl+.5,pt+.5,IW-1,IH-1);
-  // axis ticks
-  const xv=i=> (ax.xData&&ax.xData[i])?ax.xData[i][0]:i, yv=j=> (ax.yData&&ax.yData[0])?ax.yData[0][j]:j;
-  g.fillStyle=INKa(.6); g.font='9px '+monoStack(); g.textBaseline='alphabetic';
-  const xstep=Math.ceil(nx/6);
-  for(let i=0;i<nx;i+=xstep){ g.textAlign='center'; g.fillText(fmt(xv(i)), pl+(i+0.5)*cw, H-pb+13); }
-  const ystep=Math.ceil(ny/6);
-  for(let j=0;j<ny;j+=ystep){ g.textAlign='right'; g.fillText(fmt(yv(j)), pl-5, pt+(ny-1-j+0.5)*ch+3); }
-  // axis titles
-  g.fillStyle=INK; g.font='700 9.5px '+dispStack(); g.textAlign='center';
-  g.fillText(axisTitle(meta.xName), pl+IW/2, H-4);
-  g.save(); g.translate(11,pt+IH/2); g.rotate(-Math.PI/2); g.textAlign='center'; g.fillText(axisTitle(meta.yName),0,0); g.restore();
-  return {lo,hi};
-}
-function axisTitle(k){ const a=SWEEP_AXES.find(x=>x.k===k); if(a) return (a.lab+(a.u?' ('+a.u+')':'')).toUpperCase();
-  const M={sigmaMean_Sm:'OCEAN σ (S/m)', D_km:'OCEAN THICKNESS (km)'}; return M[k]||String(k).toUpperCase(); }
-
-/* light marching-squares: a few iso-lines over the finite region */
-function contours(g, Z, V, nx, ny, lo, hi, cx, cy){
-  if(nx<2||ny<2) return;
+  // contours at the interior majors of the value scale, labeled inline
   const val=(i,j)=>{ const ok=V&&V[i]?V[i][j]:false, v=Z&&Z[i]?Z[i][j]:null; return (ok&&v!=null&&isFinite(v))?v:null; };
-  const nL=4; g.strokeStyle=INKa(.30); g.lineWidth=1;
-  for(let L=1;L<=nL;L++){
-    const lev=lo+(hi-lo)*L/(nL+1);
-    for(let i=0;i<nx-1;i++)for(let j=0;j<ny-1;j++){
-      const a=val(i,j),b=val(i+1,j),c=val(i+1,j+1),d=val(i,j+1);
-      if(a==null||b==null||c==null||d==null) continue;
-      const pts=[]; const edge=(v1,v2,x1,y1,x2,y2)=>{ if((v1<lev)!==(v2<lev)){ const t=(lev-v1)/((v2-v1)||1); pts.push([x1+(x2-x1)*t,y1+(y2-y1)*t]); } };
-      const xi=cx(i),xi1=cx(i+1),yj=cy(j),yj1=cy(j+1);
-      edge(a,b,xi,yj,xi1,yj); edge(b,c,xi1,yj,xi1,yj1); edge(c,d,xi1,yj1,xi,yj1); edge(d,a,xi,yj1,xi,yj);
-      if(pts.length>=2){ g.beginPath(); g.moveTo(pts[0][0],pts[0][1]); g.lineTo(pts[1][0],pts[1][1]); g.stroke(); }
+  const ccx=i=>pl+(i+0.5)*cw, ccy=j=>pt+(ny-1-j+0.5)*ch;
+  const lt=linTicks(lo,hi,5);
+  const levels=lt.majors.filter(v=>v>lo+1e-9*span&&v<hi-1e-9*span);
+  const fieldC=opts.export?'#FFFFFF':'#FCFCFB';
+  g.save(); g.beginPath(); g.rect(pl,pt,IW,IH); g.clip();
+  levels.forEach(lev=>{
+    const segs=marchSegs(val,nx,ny,lev,ccx,ccy);
+    g.strokeStyle=INKa(.38); g.lineWidth=1;
+    segs.forEach(s=>{ g.beginPath(); g.moveTo(s[0][0],s[0][1]); g.lineTo(s[1][0],s[1][1]); g.stroke(); });
+    if(segs.length){
+      const cxm=pl+IW/2, cym=pt+IH/2; let best=null,bd=Infinity;
+      segs.forEach(s=>{ const mx=(s[0][0]+s[1][0])/2, my=(s[0][1]+s[1][1])/2, d=Math.hypot(mx-cxm,my-cym);
+        if(d<bd){ bd=d; best=[mx,my]; } });
+      const txt=fmtTick(lev,lt.step);
+      g.font='8px '+monoStack(); g.textAlign='center'; g.textBaseline='middle';
+      g.lineWidth=3; g.strokeStyle=fieldC; g.strokeText(txt,best[0],best[1]);
+      g.fillStyle=INKa(.8); g.fillText(txt,best[0],best[1]);
+      g.textBaseline='alphabetic';
     }
-  }
+  });
+  g.restore();
+  // scale-aware axes: tick values placed by piecewise-linear interpolation of
+  // the axis sample vector in index space (cells stay index-uniform)
+  const xVals=[], yVals=[];
+  for(let i=0;i<nx;i++) xVals.push(ax.xData&&ax.xData[i]?ax.xData[i][0]:i);
+  for(let j=0;j<ny;j++) yVals.push(ax.yData&&ax.yData[0]?ax.yData[0][j]:j);
+  const posX=iv=>v=>pl+(idxOf(iv,v)+0.5)*cw;
+  const posY=iv=>v=>pt+(ny-0.5-idxOf(iv,v))*ch;
+  const axisDesc=(isLog, vals, pos, name, pxSpan)=>{
+    if(isLog){
+      const iv=vals.map(Math.log10), l0=iv[0], l1=iv[iv.length-1];
+      const t=logTicks(l0,l1), perDec=pxSpan/Math.max(1e-9,l1-l0);
+      let labelTicks=null;
+      if(l1-l0>6){ const ev=Math.ceil((l1-l0)/6); labelTicks=t.majors.filter(e=>e%ev===0); }
+      return {ticks:t.majors, minors:perDec>=18?t.minors:[], labelTicks, pos:pos(iv), label:axisTitle(name), fmt:e=>'10'+sup(e)};
+    }
+    const t=linTicks(vals[0], vals[vals.length-1], 5);
+    return {ticks:t.majors, minors:t.minors, pos:pos(vals), label:axisTitle(name), fmt:v=>fmtTick(v,t.step)};
+  };
+  drawFrame(g, {x:pl,y:pt,w:IW,h:IH}, {
+    x:axisDesc(ax.xScale==='log', xVals, posX, meta.xName, IW),
+    y:axisDesc(ax.yScale==='log', yVals, posY, meta.yName, IH),
+  }, W, H);
+  // in-canvas colorbar: right of the plot, ramp gradient (bottom=lo), ticked
+  const cbX=pl+IW+8, cbW=10;
+  const grad=g.createLinearGradient(0,pt+IH,0,pt);
+  [0,.25,.5,.75,1].forEach(tv=>grad.addColorStop(tv, ramp(tv)));
+  g.fillStyle=grad; g.fillRect(cbX,pt,cbW,IH);
+  g.strokeStyle=INKa(.45); g.lineWidth=1; g.strokeRect(cbX+.5,pt+.5,cbW-1,IH-1);
+  const ct=linTicks(lo,hi,4);
+  g.font='8.5px '+monoStack(); g.textBaseline='middle';
+  ct.majors.forEach(v=>{ const py=pt+IH-((v-lo)/span)*IH;
+    g.strokeStyle=INKa(.45); g.beginPath();
+    g.moveTo(cbX+cbW-1,Math.round(py)+.5); g.lineTo(cbX+cbW-4,Math.round(py)+.5); g.stroke();
+    g.fillStyle=INKa(.62); g.textAlign='left'; g.fillText(fmtTick(v,ct.step), cbX+cbW+3, py); });
+  g.textBaseline='alphabetic';
+  const isInd=meta.mode==='inductogram';
+  const cbLabel=isInd?('|Aₑ| · '+zKey):(zLabel(zKey)+(zUnit(zKey)?' ('+zUnit(zKey)+')':''));
+  g.save(); g.translate(W-4, pt+IH/2); g.rotate(-Math.PI/2);
+  g.fillStyle=INK; g.font='9.5px '+monoStack(); g.textAlign='center'; g.fillText(cbLabel,0,0); g.restore();
+  return {lo,hi,step:lt.step};
 }
+function axisTitle(k){ const a=SWEEP_AXES.find(x=>x.k===k);
+  if(a) return (a.sym||a.lab)+(a.u?' ('+a.u+')':'');
+  const M={sigmaMean_Sm:'σ_ocean (S m⁻¹)', D_km:'D (km)'}; return M[k]||String(k); }
 
-function repaintHeat(){
-  const cv=$('#heat'); if(!cv) return;
-  const zKey=$('#exZ').value;
-  const rng=drawHeatmap(cv, gridState, zKey);
-  const host=$('#heatMeta'); if(!host) return;
-  if(!gridState){ host.innerHTML=''; return; }
-  const m=gridState.meta, moi=gridState.moi||{}, isInd=m.mode==='inductogram';
-  const lo=rng?rng.lo:null, hi=rng?rng.hi:null;
-  const nvalid=(gridState.grid.VALID||[]).reduce((s,row)=>s+row.filter(Boolean).length,0);
-  const stops=[0,.25,.5,.75,1].map(t=>ramp(t)).join(',');
-  const cbLabel = isInd ? ('|Aₑ| · '+zKey) : (zLabel(zKey)+' '+(zUnit(zKey)?'('+zUnit(zKey)+')':''));
+/* param-driven repaint shared by both heatmap panels */
+function repaintGrid(state, cvSel, metaSel, zSel){
+  const cv=$(cvSel); if(!cv) return;
+  const zKey=$(zSel).value;
+  const rng=drawHeatmap(cv, state, zKey);
+  const host=$(metaSel); if(!host) return;
+  if(!state){ host.innerHTML=''; return; }
+  const m=state.meta, moi=state.moi||{}, isInd=m.mode==='inductogram';
+  const nvalid=(state.grid.VALID||[]).reduce((s,row)=>s+row.filter(Boolean).length,0);
+  const ntot=m.nx*m.ny, ninv=ntot-nvalid;
   const exc = isInd ? (m.excitations||[]).find(e=>e.label===zKey) : null;
   host.innerHTML=
-    `<div class="cbar" style="background:linear-gradient(90deg,${stops})"></div>`+
-    `<div class="cbl"><span>${lo!=null?fmt(lo):'—'}</span><span>${cbLabel}</span><span>${hi!=null?fmt(hi):'—'}</span></div>`+
+    (!isInd&&ninv>0?`<div class="mrow"><span class="mk">Invalid</span><span>hatched — no converged model (${ninv} / ${ntot})</span></div>`:'')+
     `<div class="mrow"><span class="mk">Body</span><span>${m.body}</span></div>`+
     `<div class="mrow"><span class="mk">Grid</span><span>${m.nx} × ${m.ny}</span></div>`+
     (isInd
       ? `<div class="mrow"><span class="mk">Excitation</span><span>${zKey}</span></div>`+
         (exc&&exc.Texc_hr!=null?`<div class="mrow"><span class="mk">Period</span><span>${(+exc.Texc_hr).toFixed(2)} hr</span></div>`:'')
       : `<div class="mrow"><span class="mk">Valid</span><span>${nvalid} / ${m.nx*m.ny}</span></div>`)+
-    `<div class="mrow"><span class="mk">X · ${m.xName}</span><span>${fmt((gridState.axes.xData[0]||[])[0])}–${fmt((gridState.axes.xData[m.nx-1]||[])[0])}</span></div>`+
-    `<div class="mrow"><span class="mk">Y · ${m.yName}</span><span>${fmt((gridState.axes.yData[0]||[])[0])}–${fmt((gridState.axes.yData[0]||[])[m.ny-1])}</span></div>`+
+    `<div class="mrow"><span class="mk">X · ${m.xName}</span><span>${fmt((state.axes.xData[0]||[])[0])}–${fmt((state.axes.xData[m.nx-1]||[])[0])}</span></div>`+
+    `<div class="mrow"><span class="mk">Y · ${m.yName}</span><span>${fmt((state.axes.yData[0]||[])[0])}–${fmt((state.axes.yData[0]||[])[m.ny-1])}</span></div>`+
     (!isInd&&moi.Cmeasured!=null?`<div class="mrow"><span class="mk">C/MR² obs</span><span>${(+moi.Cmeasured).toFixed(3)}±${(+moi.Cupper).toFixed(3)}</span></div>`:'');
 }
+function repaintExplore(){ repaintGrid(exploreState, '#heatEx', '#exMeta', '#exZ'); regSweeps(); }
+function repaintInduct(){ repaintGrid(inductState, '#heatIn', '#inMeta', '#inZ'); regSweeps(); }
 
-async function runGrid(){
-  if(!backend){ openModal(); return; }
-  const btn=$('#runGrid'), rl=$('#runGrid .rl');
-  const mode=$('#exMode').value, n=+$('#exN').value;
-  const spec=await buildSpec();          // full body defaults + ocean/core
-  delete spec.run;
-  spec.bulk=spec.bulk||{}; spec.ocean=spec.ocean||{};
-  if(mode==='inductogram'){
-    spec.mode='inductogram'; delete spec.explore;
-    spec.induct={nSigmaPts:n, nDpts:n};
-  } else {
-    const xk=$('#exX').value, yk=$('#exY').value;
-    if(xk===yk){ flashTool('#exNeeds','pick two different axes'); return; }
-    spec.mode='exploreogram';
-    // clear single-run hydrosphere constraints that the sweep will set itself
-    [xk,yk].forEach(k=>{ if(k==='Tb_K')delete spec.bulk.Tb_K; if(k==='zb_approximate_km')delete spec.bulk.zb_approximate_km; if(k==='wOcean_ppt')delete spec.ocean.wOcean_ppt; });
-    spec.explore={xName:xk,yName:yk,zName:SWEEP_Z.map(z=>z.k),
-      xRange:[+$('#exX0').value,+$('#exX1').value], yRange:[+$('#exY0').value,+$('#exY1').value], nx:n, ny:n};
-  }
-  btn.disabled=true; btn.classList.add('running'); rl.textContent='Running '+n+'×'+n;
+/* report job: ExploreOgram over salinity × ice-base T (fixed 5 × 5) */
+async function runExplore(spec){
+  setSecStatus('#stExplore','running');
   try{
-    const sub=await (await api('/runs',{method:'POST',body:JSON.stringify(spec)})).json();
-    if(!sub.id) throw new Error((sub.detail&&sub.detail[0]&&sub.detail[0].message)||'rejected');
-    await streamRun(sub.id);
-    const res=await (await api('/runs/'+sub.id+'/result')).json();
+    delete spec.run; spec.mode='exploreogram';
+    spec.bulk=spec.bulk||{}; spec.ocean=spec.ocean||{};
+    const xk='wOcean_ppt', yk='Tb_K';
+    // the sweep owns salinity × Tb: drop the third constraint (zb) so the spec carries
+    // exactly the two swept fields — validation needs 2-of-3 set; the sweep overrides
+    // the swept values per cell, so they are baselines only.
+    delete spec.bulk.zb_approximate_km;
+    if(spec.bulk.Tb_K==null) spec.bulk.Tb_K=parseFloat($('.con .val input[data-k="Tb"]').value);
+    if(spec.ocean.wOcean_ppt==null) spec.ocean.wOcean_ppt=parseFloat($('.con .val input[data-k="w"]').value);
+    const xr=SWEEP_AXES.find(a=>a.k===xk).r, yr=SWEEP_AXES.find(a=>a.k===yk).r;
+    spec.explore={xName:xk, yName:yk, zName:SWEEP_Z.map(z=>z.k), xRange:xr, yRange:yr, nx:5, ny:5};
+    const res=await runToResult(spec);
     if(!res.grid) throw new Error('no grid returned');
-    gridState=res;
+    exploreState=res;
     const avail=res.meta.availableZ||[];
-    if(mode==='inductogram'){
-      const def=avail.includes('synodic')?'synodic':avail[0];
-      fillSel('#exZ', avail.map(k=>[k, k]), def);
-    } else {
-      fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), avail.includes($('#exZ').value)?$('#exZ').value:'D_km');
-    }
-    repaintHeat();
-  }catch(e){ flashTool('#exNeeds', e.message||'sweep failed'); }
-  finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Run sweep'; }
+    fillSel('#exZ', avail.map(k=>[k, zLabel(k)+(zUnit(k)?' ('+zUnit(k)+')':'')]), avail.includes($('#exZ').value)?$('#exZ').value:'D_km');
+    repaintExplore();
+    setSecStatus('#stExplore','done');
+  }catch(e){ setSecStatus('#stExplore','error', e.message||'sweep failed'); }
 }
-function toggleSweepMode(){
-  const induct=$('#exMode').value==='inductogram';
-  $$('#exploreSec .axcell').forEach(c=>c.hidden=induct);
-  $$('#exploreSec .indnote').forEach(c=>c.hidden=!induct);
-  $('#exZlab').textContent=induct?'Excitation':'Color by';
+
+/* report job: InductOgram over ocean σ × thickness (fixed 6 × 6) */
+async function runInduct(spec){
+  setSecStatus('#stInduct','running');
+  try{
+    delete spec.run; delete spec.explore; spec.mode='inductogram';
+    spec.induct={nSigmaPts:6, nDpts:6};
+    const res=await runToResult(spec);
+    if(!res.grid) throw new Error('no grid returned');
+    inductState=res;
+    const avail=res.meta.availableZ||[];
+    fillSel('#inZ', avail.map(k=>[k, k]), avail.includes('synodic')?'synodic':avail[0]);
+    repaintInduct();
+    setSecStatus('#stInduct','done');
+  }catch(e){ setSecStatus('#stInduct','error', e.message||'sweep failed'); }
 }
 
 /* ---------------------------------------------------------------- inference */
-let artifacts=[], infState=null;
+let artifacts=[], infState=null, curArt=null;
 
 function texClean(s){ return String(s||'').replace(/\$/g,'')
   .replace(/\\mathrm\{([^}]*)\}/g,'$1').replace(/\\text\{([^}]*)\}/g,'$1')
@@ -1091,21 +1417,34 @@ function texClean(s){ return String(s||'').replace(/\$/g,'')
   .replace(/[\\{}]/g,''); }
 
 async function loadArtifacts(){
-  if(!backend) return;
+  if(!backend || artifacts.length) return;
   try{
     const r=await (await api('/infer/artifacts')).json();
     artifacts=r.artifacts||[];
-    fillSel('#infArt', artifacts.map(a=>[a.id, a.label]), artifacts[0]&&artifacts[0].id);
-    renderObsForm();
   }catch(e){ /* leave prompt */ }
 }
-function curArtifact(){ return artifacts.find(a=>a.id===$('#infArt').value)||artifacts[0]; }
+/* the report conditions on the posterior trained for the selected body */
+function artifactForBody(body){ return artifacts.find(a=>a.body===body)||null; }
+function setInferVisible(vis, body){
+  const none=$('#infNone');
+  none.hidden=vis;
+  if(!vis) none.textContent='no trained posterior for '+body;
+  ['#infScope','#obsForm','#cornerWrap','#infGuards','#artPickCell'].forEach(s=>{ const el=$(s); if(el) el.hidden=!vis; });
+}
+/* passive: switch trained posterior for this body and re-sample */
+function onPickArtifact(){
+  const a=artifacts.find(x=>x.id===$('#infArt').value);
+  if(!a){ return; }
+  curArt=a; renderObsForm();
+  setSecStatus('#stInfer','running');
+  doInfer().then(()=>setSecStatus('#stInfer','done')).catch(e=>setSecStatus('#stInfer','error', e.message));
+}
 function obsDisplay(a,name){
   const conv=(a.channelConventions&&a.channelConventions[name])||(name.startsWith('Im_')?a.imagConvention:null);
   return conv==='abs' ? '|'+name.replace('Im_','Im ')+'|' : name;
 }
 function renderObsForm(){
-  const a=curArtifact(); const host=$('#obsForm'); const scope=$('#infScope');
+  const a=curArt; const host=$('#obsForm'); const scope=$('#infScope');
   if(!a){ host.innerHTML=''; return; }
   scope.hidden=false; scope.textContent=a.scopeNote||'';
   host.innerHTML=a.obsNames.map(nm=>{
@@ -1115,37 +1454,74 @@ function renderObsForm(){
       `<input class="mono" id="obs_${nm}" value="${val!=null?val:''}" inputmode="decimal" aria-label="${nm}">`+
       `<span class="sig">±${sig!=null?fmt(sig):'—'}${lim?'  ['+lim[0]+','+lim[1]+']':''}</span></div>`;
   }).join('');
+  // passive interactivity: editing an observable auto-resamples (debounced)
+  host.querySelectorAll('input').forEach(el=> el.addEventListener('input', queueResample));
 }
-async function runInfer(){
-  if(!backend){ openModal(); return; }
-  const a=curArtifact(); if(!a) return;
-  const btn=$('#runInfer'), rl=$('#runInfer .rl');
+/* amortized POST /infer conditioned on the current observable-form values */
+let _infSeq=0;  // request-sequence token: only the newest /infer response may render
+async function doInfer(){
+  const a=curArt; if(!a||!backend) return;
+  const seq=++_infSeq;
   const x_obs={}; a.obsNames.forEach(nm=>{ const el=$('#obs_'+nm); if(el&&el.value!=='') x_obs[nm]=+el.value; });
-  btn.disabled=true; btn.classList.add('running'); rl.textContent='Sampling';
+  const r=await api('/infer',{method:'POST',body:JSON.stringify({artifact:a.id,x_obs,nSamples:10000,seed:0})});
+  const inf=await r.json();
+  if(seq!==_infSeq) return;  // superseded by a newer request; drop stale response
+  if(!r.ok) throw new Error((inf.detail&&inf.detail[0]&&(inf.detail[0].message||inf.detail[0]))||'inference failed');
+  infState=inf; drawCorner($('#corner'), inf); renderSummary(inf); regInference();
+}
+/* report job: pick the posterior trained for this body, sample it */
+async function runInference(){
+  setSecStatus('#stInfer','running');
   try{
-    const r=await api('/infer',{method:'POST',body:JSON.stringify({artifact:a.id,x_obs,nSamples:+$('#infN').value,seed:0})});
-    const inf=await r.json();
-    if(!r.ok) throw new Error((inf.detail&&inf.detail[0]&&(inf.detail[0].message||inf.detail[0]))||'inference failed');
-    infState=inf; drawCorner($('#corner'), inf); renderSummary(inf);
-  }catch(e){ renderGuards(null, e.message||'inference failed'); }
-  finally{ btn.disabled=false; btn.classList.remove('running'); rl.textContent='Sample posterior'; }
+    await loadArtifacts();
+    const body=$('#body').value;
+    const bodyArts=artifacts.filter(a=>a.body===body);
+    curArt=bodyArts[0]||null;
+    if(!curArt){ setInferVisible(false, body); setSecStatus('#stInfer','done'); return; }
+    setInferVisible(true);
+    // passive model picker — only shown when the body has more than one trained posterior
+    fillSel('#infArt', bodyArts.map(a=>[a.id, a.label]), curArt.id);
+    $('#artPickCell').hidden = bodyArts.length < 2;
+    renderObsForm();
+    await doInfer();
+    setSecStatus('#stInfer','done');
+  }catch(e){ renderGuards(null, e.message||'inference failed'); setSecStatus('#stInfer','error', e.message); }
+}
+let _rsT=null;
+function queueResample(){
+  if(!backend||!curArt) return;
+  clearTimeout(_rsT);
+  _rsT=setTimeout(async()=>{
+    setSecStatus('#stInfer','running');
+    try{ await doInfer(); setSecStatus('#stInfer','done'); }
+    catch(e){ setSecStatus('#stInfer','error', e.message); }
+  }, 600);
 }
 
-function drawCorner(cv, inf){
-  const box=cv.parentElement, dpr=Math.min(2,devicePixelRatio||1);
-  const W=box.clientWidth||520,H=box.clientHeight||520; cv.width=W*dpr;cv.height=H*dpr;
-  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
-  if(!inf||!inf.samples||!inf.samples.length){ note(g,W,H,'sample the posterior'); return; }
+/* separable binomial [1,2,1]/4 smoothing over an n×n grid */
+function smooth121(a, n){
+  const b=Array.from({length:n},()=>new Array(n).fill(0));
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)
+    b[i][j]=(a[Math.max(0,i-1)][j]+2*a[i][j]+a[Math.min(n-1,i+1)][j])/4;
+  const c=Array.from({length:n},()=>new Array(n).fill(0));
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)
+    c[i][j]=(b[i][Math.max(0,j-1)]+2*b[i][j]+b[i][Math.min(n-1,j+1)])/4;
+  return c;
+}
+function drawCorner(cv, inf, opts={}){
+  const {g,W,H}=ctx2d(cv,opts,700,700);
+  if(!inf||!inf.samples||!inf.samples.length){ note(g,W,H,'generate the report'); return; }
   const S=inf.samples, names=inf.paramNames, labs=(inf.paramLabels||names).map(texClean);
-  const D=names.length, pad=46, gap=3, botPad=22;
+  const D=names.length, pad=50, gap=3, botPad=34;
   const cell=(Math.min(W,H)-pad-botPad)/D;
-  // per-param display range = [p1,p99]
+  // per-param display range = [p0.5,p99.5]
   const rng=names.map((_,c)=>{ const col=S.map(r=>r[c]).filter(isFinite).sort((a,b)=>a-b);
     const q=p=>col[Math.max(0,Math.min(col.length-1,Math.floor(p*col.length)))];
     let lo=q(0.005),hi=q(0.995); if(hi<=lo)hi=lo+1; return [lo,hi]; });
   const px=(c,v)=>pad+c*cell+gap+((v-rng[c][0])/((rng[c][1]-rng[c][0])||1))*(cell-2*gap);
   const py=(r,v)=>pad+r*cell+gap+(1-(v-rng[r][0])/((rng[r][1]-rng[r][0])||1))*(cell-2*gap);
   const step=Math.max(1,Math.floor(S.length/1400));  // downsample scatter
+  const NB=40;
   for(let r=0;r<D;r++)for(let c=0;c<=r;c++){
     const x0=pad+c*cell, y0=pad+r*cell;
     g.strokeStyle=INKa(.14); g.lineWidth=1; g.strokeRect(x0+.5,y0+.5,cell-1,cell-1);
@@ -1154,23 +1530,70 @@ function drawCorner(cv, inf){
       const nb=22, lo=rng[c][0], hi=rng[c][1], bins=new Array(nb).fill(0);
       S.forEach(row=>{ const v=row[c]; if(!isFinite(v))return; let b=Math.floor((v-lo)/((hi-lo)||1)*nb); b=Math.max(0,Math.min(nb-1,b)); bins[b]++; });
       const mx=Math.max(...bins)||1;
-      g.fillStyle=hexA('#6E92A8',.55); g.strokeStyle='#6E92A8'; g.lineWidth=1; g.beginPath();
+      g.fillStyle=hexA('#6E92A8',.55);
       for(let b=0;b<nb;b++){ const x=x0+gap+(b/nb)*(cell-2*gap), w=(cell-2*gap)/nb, h=(bins[b]/mx)*(cell-2*gap-4);
         g.fillRect(x, y0+cell-gap-h, w+.5, h); }
-      // median line
-      const med=(inf.summary[names[c]]||{}).median;
-      if(med!=null){ const mx2=px(c,med); g.strokeStyle='#E4322B'; g.lineWidth=1; g.beginPath(); g.moveTo(mx2,y0+gap); g.lineTo(mx2,y0+cell-gap); g.stroke(); }
+      // median line + median±68% annotation above the panel (corner.py convention)
+      const s=(inf.summary||{})[names[c]]||{};
+      if(s.median!=null){ const mx2=px(c,s.median); g.strokeStyle='#E4322B'; g.lineWidth=1;
+        g.beginPath(); g.moveTo(mx2,y0+gap); g.lineTo(mx2,y0+cell-gap); g.stroke();
+        const up=s.p84!=null?s.p84-s.median:null, dn=s.p16!=null?s.median-s.p16:null;
+        const txt=fmtSig(s.median)+(up!=null?' +'+fmtSig(up):'')+(dn!=null?' −'+fmtSig(dn):'');
+        g.fillStyle=INK; g.font='7.5px '+monoStack(); g.textAlign='center';
+        g.fillText(txt, x0+cell/2, y0-3); }
     } else {
-      // 2D scatter (param c on x, param r on y)
+      // 2D scatter (param c on x, param r on y) under 1σ/2σ density contours
       g.fillStyle=hexA('#22242A',.16);
       for(let k=0;k<S.length;k+=step){ const vx=S[k][c],vy=S[k][r]; if(!isFinite(vx)||!isFinite(vy))continue;
         g.fillRect(px(c,vx)-0.6, py(r,vy)-0.6, 1.4, 1.4); }
+      const hb=Array.from({length:NB},()=>new Array(NB).fill(0));
+      const [cl0,cl1]=rng[c],[rl0,rl1]=rng[r];
+      for(let k=0;k<S.length;k++){ const vx=S[k][c],vy=S[k][r]; if(!isFinite(vx)||!isFinite(vy))continue;
+        const bi=Math.floor((vx-cl0)/((cl1-cl0)||1)*NB), bj=Math.floor((vy-rl0)/((rl1-rl0)||1)*NB);
+        if(bi<0||bi>=NB||bj<0||bj>=NB) continue; hb[bi][bj]++; }
+      let sm=smooth121(hb,NB); sm=smooth121(sm,NB);
+      const flat=[]; for(const row of sm) for(const v of row) flat.push(v);
+      flat.sort((a,b)=>b-a);
+      const tot=flat.reduce((s2,v)=>s2+v,0);
+      if(tot>0){
+        // corner.py 2-D Gaussian mass fractions: 0.393 (1σ), 0.865 (2σ)
+        let cum=0, lev1=null, lev2=null;
+        for(const v of flat){ cum+=v;
+          if(lev1==null&&cum>=0.393*tot) lev1=v;
+          if(cum>=0.865*tot){ lev2=v; break; } }
+        const ccx=i=>x0+gap+((i+0.5)/NB)*(cell-2*gap);
+        const ccy=j=>y0+cell-gap-((j+0.5)/NB)*(cell-2*gap);
+        const vf=(i,j)=>sm[i][j];
+        [[lev2,INKa(.45),1],[lev1,'#6E92A8',1.2]].forEach(([lev,col,lw])=>{
+          if(lev==null||lev<=0) return;
+          const segs=marchSegs(vf,NB,NB,lev,ccx,ccy);
+          g.strokeStyle=col; g.lineWidth=lw;
+          segs.forEach(s2=>{ g.beginPath(); g.moveTo(s2[0][0],s2[0][1]); g.lineTo(s2[1][0],s2[1][1]); g.stroke(); });
+        });
+      }
     }
-    // labels on left column + bottom row
+    // tick values on bottom row + left column only (2-3 majors, inward 3px)
+    if(r===D-1){
+      const t=linTicks(rng[c][0],rng[c][1],3);
+      t.majors.forEach(v=>{ const X2=Math.round(px(c,v))+.5;
+        g.strokeStyle=INKa(.45); g.lineWidth=1;
+        g.beginPath(); g.moveTo(X2, pad+D*cell-1); g.lineTo(X2, pad+D*cell-4); g.stroke();
+        g.fillStyle=INKa(.62); g.font='7.5px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
+        g.fillText(fmtTick(v,t.step), px(c,v), pad+D*cell+3); g.textBaseline='alphabetic'; });
+    }
+    if(c===0&&r>0){
+      const t=linTicks(rng[r][0],rng[r][1],3);
+      t.majors.forEach(v=>{ const Y2=Math.round(py(r,v))+.5;
+        g.strokeStyle=INKa(.45); g.lineWidth=1;
+        g.beginPath(); g.moveTo(pad+1,Y2); g.lineTo(pad+4,Y2); g.stroke();
+        g.fillStyle=INKa(.62); g.font='7.5px '+monoStack(); g.textAlign='right'; g.textBaseline='middle';
+        g.fillText(fmtTick(v,t.step), pad-4, py(r,v)); g.textBaseline='alphabetic'; });
+    }
+    // param name labels, outward of the tick labels
     if(c===0){ g.save(); g.fillStyle=INK; g.font='8.5px '+monoStack(); g.textAlign='center';
-      g.translate(pad-12, y0+cell/2); g.rotate(-Math.PI/2); g.fillText(labs[r].slice(0,12),0,0); g.restore(); }
+      g.translate(10, y0+cell/2); g.rotate(-Math.PI/2); g.fillText(labs[r].slice(0,12),0,0); g.restore(); }
     if(r===D-1){ g.fillStyle=INK; g.font='8.5px '+monoStack(); g.textAlign='center'; g.textBaseline='top';
-      g.fillText(labs[c].slice(0,12), x0+cell/2, pad+D*cell+6); g.textBaseline='alphabetic'; }
+      g.fillText(labs[c].slice(0,12), x0+cell/2, pad+D*cell+20); g.textBaseline='alphabetic'; }
   }
 }
 function renderSummary(inf){
@@ -1201,33 +1624,330 @@ function renderGuards(inf, err){
 function fmtSig(v){ if(v==null||!isFinite(v))return '—'; const a=Math.abs(v);
   return a>=1000?v.toExponential(2):a>=1?v.toFixed(2):a>=0.01?v.toFixed(3):v.toExponential(1); }
 
-/* ---- select helper + tool init/enable ---- */
+/* ---- select helper + report-section init/enable ---- */
 function fillSel(sel, pairs, selected){ const el=$(sel); if(!el) return;
   el.innerHTML=pairs.map(([v,l])=>`<option value="${v}"${v===selected?' selected':''}>${l}</option>`).join(''); }
-function flashTool(sel,msg){ const n=$(sel); if(!n) return; n.hidden=false; n.innerHTML='<b>'+String(msg).slice(0,80)+'</b>'; }
 
 function initTools(){
-  fillSel('#exX', SWEEP_AXES.map(a=>[a.k, a.lab+(a.u?' ('+a.u+')':'')]), 'wOcean_ppt');
-  fillSel('#exY', SWEEP_AXES.map(a=>[a.k, a.lab+(a.u?' ('+a.u+')':'')]), 'Tb_K');
   fillSel('#exZ', SWEEP_Z.map(z=>[z.k, z.lab+(z.u?' ('+z.u+')':'')]), 'D_km');
-  const setRange=(selId,x0,x1)=>{ const a=SWEEP_AXES.find(v=>v.k===$(selId).value); if(a){ $(x0).value=a.r[0]; $(x1).value=a.r[1]; } };
-  setRange('#exX','#exX0','#exX1'); setRange('#exY','#exY0','#exY1');
-  $('#exX').addEventListener('change',()=>setRange('#exX','#exX0','#exX1'));
-  $('#exY').addEventListener('change',()=>setRange('#exY','#exY0','#exY1'));
-  $('#exZ').addEventListener('change', repaintHeat);
-  $('#exMode').addEventListener('change', toggleSweepMode);
-  toggleSweepMode();
-  $('#runGrid').onclick=runGrid;
-  $('#infArt').addEventListener('change', renderObsForm);
-  $('#runInfer').onclick=runInfer;
-  drawHeatmap($('#heat'),null); drawCorner($('#corner'),null);
+  fillSel('#inZ', [['synodic','synodic']], 'synodic');
+  $('#exZ').addEventListener('change', repaintExplore);
+  $('#inZ').addEventListener('change', repaintInduct);
+  $('#infArt').addEventListener('change', onPickArtifact);
+  drawHeatmap($('#heatEx'),null); drawHeatmap($('#heatIn'),null); drawCorner($('#corner'),null);
   toolsBackendState();
 }
 function toolsBackendState(){
   const on=!!backend;
   $('#exNeeds').hidden=on; $('#infNeeds').hidden=on;
   if(on) loadArtifacts();
+  syncExportButtons();
 }
+
+/* ===== EXPORTS =============================================================
+   Figure registry + PNG/CSV/ZIP export. Figures re-render offscreen at 3x on a
+   white background via the shared renderer contract (ctx2d + opts.export).
+   ZIP files are STORE-method (no compression) with UTF-8 names.               */
+
+let lastSpec=null;                 // model spec captured in generateReport()
+let lastResults={single:null};     // raw single-run JSON from runSingle()
+
+const figRegistry=Object.create(null);   // secId -> [{name,w,h,draw(cv,opts)}]
+function regFig(secId, name, w, h, draw){ (figRegistry[secId] ??= []).push({name,w,h,draw}); }
+
+function exBtnsHTML(sec){
+  return `<span class="fsp"></span><span class="exbtns" data-sec="${sec}">`+
+    `<button class="exb" data-ex="figures">figures &#8615;</button>`+
+    `<button class="exb" data-ex="data">data &#8615;</button></span>`;
+}
+function regSweeps(){
+  figRegistry.sweeps=[];
+  if(exploreState){ const z=$('#exZ').value;
+    regFig('sweeps','explore-'+slug(z),460,356,(cv,o={})=>drawHeatmap(cv,exploreState,$('#exZ').value,o)); }
+  if(inductState){ const z=$('#inZ').value;
+    regFig('sweeps','induct-'+slug(z),460,356,(cv,o={})=>drawHeatmap(cv,inductState,$('#inZ').value,o)); }
+  syncExportButtons();
+}
+function regInference(){
+  figRegistry.inference=[];
+  regFig('inference','corner',700,700,(cv,o={})=>drawCorner(cv,infState,o));
+  syncExportButtons();
+}
+function secDataReady(sec){
+  switch(sec){
+    case 'interior': case 'structure': case 'thermodynamics':
+    case 'seismic': case 'electrical': return !!current;
+    case 'gravity':   return !!(current&&current.grav);
+    case 'induction': return !!(current&&current.induct);
+    case 'sweeps':    return !!(exploreState||inductState);
+    case 'inference': return !!infState;
+  }
+  return false;
+}
+function syncExportButtons(){
+  $$('.exbtns').forEach(sp=>{ const sec=sp.dataset.sec;
+    const bf=sp.querySelector('[data-ex="figures"]'), bd=sp.querySelector('[data-ex="data"]');
+    if(bf) bf.disabled=!(figRegistry[sec]&&figRegistry[sec].length);
+    if(bd) bd.disabled=!secDataReady(sec);
+  });
+  const ba=$('#exportAll');
+  if(ba&&!ba.classList.contains('running'))
+    ba.disabled=!Object.keys(figRegistry).some(s=>figRegistry[s]&&figRegistry[s].length);
+}
+
+/* ---- naming + small utilities ---- */
+const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const fname=(sec,name,ext)=>`${slug($('#body').value)}_${sec}_${name}.${ext}`;
+const strU8=s=>new TextEncoder().encode(s);
+/* CRLF CSV; quote fields containing [",\n]; numbers at full precision */
+function toCSV(header, rows){
+  const cell=v=>{
+    if(v==null) return '';
+    if(typeof v==='number') return isFinite(v)?JSON.stringify(v):'';
+    const s=String(v);
+    return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  };
+  return [header,...rows].map(r=>r.map(cell).join(',')).join('\r\n')+'\r\n';
+}
+function saveBlob(name, blob){
+  const u=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+
+/* ---- STORE-method ZIP writer (CRC-32, UTF-8 names, no compression) ---- */
+let CRC_T=null;
+function crc32(u8){
+  if(!CRC_T){ CRC_T=new Int32Array(256);
+    for(let n=0;n<256;n++){ let c=n;
+      for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+      CRC_T[n]=c; } }
+  let c=-1;
+  for(let i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&255]^(c>>>8);
+  return (c^-1)>>>0;
+}
+function zipStore(files){
+  const parts=[], central=[]; let off=0, count=0;
+  const d=new Date();
+  const dosT=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);
+  const dosD=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  for(const f of files){
+    const nm=strU8(f.name), crc=crc32(f.u8), sz=f.u8.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);  lh.setUint16(4,20,true);  lh.setUint16(6,0x0800,true);
+    lh.setUint16(8,0,true);           lh.setUint16(10,dosT,true); lh.setUint16(12,dosD,true);
+    lh.setUint32(14,crc,true);        lh.setUint32(18,sz,true);   lh.setUint32(22,sz,true);
+    lh.setUint16(26,nm.length,true);  lh.setUint16(28,0,true);
+    parts.push(new Uint8Array(lh.buffer), nm, f.u8);
+    const ce=new DataView(new ArrayBuffer(46));
+    ce.setUint32(0,0x02014b50,true);  ce.setUint16(4,20,true);   ce.setUint16(6,20,true);
+    ce.setUint16(8,0x0800,true);      ce.setUint16(10,0,true);
+    ce.setUint16(12,dosT,true);       ce.setUint16(14,dosD,true);
+    ce.setUint32(16,crc,true);        ce.setUint32(20,sz,true);  ce.setUint32(24,sz,true);
+    ce.setUint16(28,nm.length,true);  /* extra/comment/disk/attrs stay zero */
+    ce.setUint32(42,off,true);
+    central.push(new Uint8Array(ce.buffer), nm);
+    off+=30+nm.length+sz; count++;
+  }
+  let cdSize=0; for(const p of central) cdSize+=p.length;
+  const eocd=new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0,0x06054b50,true);
+  eocd.setUint16(8,count,true); eocd.setUint16(10,count,true);
+  eocd.setUint32(12,cdSize,true); eocd.setUint32(16,off,true);
+  return new Blob([...parts,...central,new Uint8Array(eocd.buffer)],{type:'application/zip'});
+}
+
+/* ---- offscreen 3x PNG render of a registry job ---- */
+function renderPNG(job){
+  return new Promise((resolve,reject)=>{
+    const cv=document.createElement('canvas');
+    try{ job.draw(cv,{w:job.w,h:job.h,dpr:3,export:true}); }catch(e){ reject(e); return; }
+    cv.toBlob(b=>{
+      if(!b){ reject(new Error('toBlob failed')); return; }
+      b.arrayBuffer().then(ab=>resolve(new Uint8Array(ab)), reject);
+    },'image/png');
+  });
+}
+async function sectionFigures(secId){
+  const out=[];
+  for(const job of (figRegistry[secId]||[]))
+    out.push({name:fname(secId,job.name,'png'), u8:await renderPNG(job)});
+  return out;
+}
+
+/* ---- per-section data builders (§2.5) ---- */
+const PROFILE_BASE=['P_MPa','T_K','rho_kgm3','g_ms2','Cp_JkgK','alpha_pK','kTherm_WmK',
+  'sigma_Sm','phi_frac','VP_kms','VS_kms','QS','KS_GPa','GS_GPa','eta_Pas','Htidal_Wm3'];
+function profileCSV(model, keys){
+  const L=model.layers, R=model.R_m;
+  const N=(L.P_MPa||L.rho_kgm3||[]).length;                 // r_m may be N+1 boundaries
+  const header=['i','r_km','z_km','phase',...keys];
+  const rows=[];
+  for(let i=0;i<N;i++)
+    rows.push([i, L.r_m[i]/1e3, (R-L.r_m[i])/1e3, L.phase[i], ...keys.map(k=>L[k]?L[k][i]:null)]);
+  return toCSV(header, rows);
+}
+function matrixCSV(xs, ys, Z){
+  const rows=ys.map((yv,j)=>[yv, ...xs.map((_,i)=>Z[i]?Z[i][j]:null)]);
+  return toCSV(['',...xs], rows);   // row 0 = blank + x values; col 0 = y ascending
+}
+function sectionData(secId){
+  const out=[], F=(n,ext,str)=>out.push({name:fname(secId,n,ext), u8:strU8(str)});
+  const m=current;
+  if(['interior','structure','thermodynamics','seismic','electrical'].includes(secId)){
+    if(!m) return out;
+    let keys;
+    if(secId==='interior'){
+      const extra=Object.keys(m.layers)
+        .filter(k=>k!=='r_m'&&k!=='phase'&&!PROFILE_BASE.includes(k)&&Array.isArray(m.layers[k])).sort();
+      keys=[...PROFILE_BASE.filter(k=>m.layers[k]), ...extra];
+    } else {
+      const sec=SECTIONS.find(x=>x.id===secId);
+      keys=(sec?sec.charts.flatMap(c=>c.key?[c.key]:(c.multi||[]).map(mm=>mm[0])):[])
+        .filter(k=>m.layers[k]);
+    }
+    F('profile','csv',profileCSV(m,keys));
+    if(secId==='interior')
+      F('summary','json',JSON.stringify({summary:lastResults.single?lastResults.single.summary:null,
+                                         stats:m.stats||null},null,2));
+  } else if(secId==='gravity'){
+    if(!m||!m.grav) return out;
+    const G=m.grav, rows=[];
+    [['h2','h','hAmp','hPhase'],['l2','l','lAmp','lPhase'],
+     ['k2','k','kAmp','kPhase'],['delta','delta','deltaAmp','deltaPhase']].forEach(([nm,c,a,p])=>{
+      const C=G[c]||{};
+      if(C.re==null&&G[a]==null) return;
+      const amp=G[a]!=null?G[a]:(C.re!=null?Math.hypot(C.re,C.im||0):null);
+      rows.push([nm, C.re!=null?C.re:null, C.im!=null?C.im:null, amp, G[p]!=null?G[p]:null]);
+    });
+    [['libration_m',G.libration_m],['Torb_s',G.Torb_s],['eccentricity',G.eccentricity]]
+      .forEach(([q,v])=>{ if(v!=null) rows.push([q,v]); });
+    F('gravity','csv',toCSV(['love','re','im','amp','phase_deg'],rows));
+    F('gravity','json',JSON.stringify(G,null,2));
+  } else if(secId==='induction'){
+    if(!m||!m.induct) return out;
+    const I=m.induct;
+    const rows=(I.calcedExc||[]).map((lab,i)=>[lab,
+      I.Texc_hr?I.Texc_hr[i]:null, I.Amp?I.Amp[i]:null, I.phase?I.phase[i]:null]);
+    F('induction','csv',toCSV(['excitation','period_hr','amp','phase_deg'],rows));
+  } else if(secId==='sweeps'){
+    if(exploreState){
+      const s=exploreState, meta=s.meta, ax=s.axes, V=s.grid.VALID, IR=s.grid.invalidReason;
+      const xs=Array.from({length:meta.nx},(_,i)=>ax.xData[i][0]);
+      const ys=Array.from({length:meta.ny},(_,j)=>ax.yData[0][j]);
+      const flds=meta.availableZ||[], rows=[];
+      for(let i=0;i<meta.nx;i++)for(let j=0;j<meta.ny;j++)for(const fld of flds)
+        rows.push([xs[i], ys[j], fld, s.grid[fld]&&s.grid[fld][i]?s.grid[fld][i][j]:null,
+                   V&&V[i]?V[i][j]:null, IR&&IR[i]?IR[i][j]:null]);
+      F('explore_long','csv',toCSV([meta.xName,meta.yName,'field','value','valid','invalid_reason'],rows));
+      const zf=$('#exZ').value;
+      if(s.grid[zf]) F('explore_'+slug(zf)+'_matrix','csv',matrixCSV(xs,ys,s.grid[zf]));
+    }
+    if(inductState){
+      const s=inductState, meta=s.meta, ax=s.axes, V=s.grid.VALID;
+      const xs=Array.from({length:meta.nx},(_,i)=>ax.xData[i][0]);
+      const ys=Array.from({length:meta.ny},(_,j)=>ax.yData[0][j]);
+      const labels=(meta.excitations||[]).map(e=>e.label).filter(l=>s.grid[l]);
+      const PH=(s.induction&&s.induction.phase)||{}, rows=[];
+      for(let i=0;i<meta.nx;i++)for(let j=0;j<meta.ny;j++)for(const lab of labels)
+        rows.push([xs[i], ys[j], lab, s.grid[lab][i]?s.grid[lab][i][j]:null,
+                   PH[lab]&&PH[lab][i]?PH[lab][i][j]:null, V&&V[i]?V[i][j]:null]);
+      F('induct_long','csv',toCSV([meta.xName,meta.yName,'excitation','amp','phase_deg','valid'],rows));
+      const zf=$('#inZ').value;
+      if(s.grid[zf]) F('induct_'+slug(zf)+'_matrix','csv',matrixCSV(xs,ys,s.grid[zf]));
+    }
+  } else if(secId==='inference'){
+    if(!infState) return out;
+    const inf=infState;
+    F('samples','csv',toCSV(inf.paramNames, inf.samples));
+    const labs=inf.paramLabels||inf.paramNames, units=inf.paramUnits||[];
+    const rows=inf.paramNames.map((nm,i)=>{ const s=(inf.summary||{})[nm]||{};
+      return [nm, texClean(labs[i]), units[i]||'', s.mean,s.std,s.median,s.p5,s.p16,s.p84,s.p95]; });
+    F('posterior_summary','csv',toCSV(['param','label','unit','mean','std','median','p5','p16','p84','p95'],rows));
+    const rest=Object.assign({},inf); delete rest.samples;
+    if(curArt) rest.artifact=curArt.id;
+    F('inference','json',JSON.stringify(rest,null,2));
+  }
+  return out;
+}
+
+/* ---- per-section export button action ---- */
+async function exportSection(secId, kind){
+  try{
+    const files = kind==='figures' ? await sectionFigures(secId) : sectionData(secId);
+    if(!files.length) return;
+    if(files.length===1){
+      const f=files[0];
+      const type=f.name.endsWith('.png')?'image/png':f.name.endsWith('.json')?'application/json':'text/csv';
+      saveBlob(f.name, new Blob([f.u8],{type}));
+    } else {
+      saveBlob(`${slug($('#body').value)}_${secId}_${kind}.zip`, zipStore(files));
+    }
+  }catch(e){ console.error('export failed:', e); }
+}
+
+/* ---- global report bundle ---- */
+const SEC_ORDER=['interior','structure','thermodynamics','seismic','electrical',
+                 'gravity','induction','sweeps','inference'];
+function buildManifest(sections){
+  return {
+    app:'MoonMelodies',
+    generatedUtc:new Date().toISOString(),
+    body:$('#body').value,
+    mode:(backend&&lastResults.single)?'live':'sample',
+    engineVersion:(backend&&backend.version)||null,
+    spec:lastSpec,
+    sections,
+  };
+}
+function readmeText(){
+  return [
+'MoonMelodies report bundle. One-dimensional interior structure models of icy moons and ocean worlds, generated in the browser by MoonMelodies (a fork of PlanetProfile). figures/ holds every chart on the page as PNG; data/ holds machine-readable tables; raw/ holds the untouched engine result JSONs; manifest.json records the body, model spec, and provenance.',
+'',
+'Figures are rendered offscreen at 3x canvas scale on a white background, so a 360x216 chart exports at 1080x648 pixels.',
+'',
+'CSV files use long format where practical, CRLF line endings, and full-precision values (no display rounding). Column names carry SI unit suffixes (_km, _K, _MPa, _kgm3, _Sm, ...). Matrix CSVs put x values across row 0 and y values down column 0.',
+'',
+'Provenance: engine '+((backend&&backend.version)||'(sample mode - no engine)')+
+' - MoonMelodies, a fork of PlanetProfile (github.com/vancesteven/PlanetProfile) - generated '+new Date().toISOString()+'.',
+''].join('\r\n');
+}
+async function exportReport(){
+  const btn=$('#exportAll'); if(!btn||btn.disabled) return;
+  const old=btn.textContent;
+  btn.disabled=true; btn.classList.add('running'); btn.textContent='Exporting…';
+  try{
+    const files=[], sections={};
+    for(const sec of SEC_ORDER){
+      let nf=0;
+      for(const job of (figRegistry[sec]||[])){          // sequential: bounds memory
+        files.push({name:'figures/'+fname(sec,job.name,'png'), u8:await renderPNG(job)});
+        nf++;
+      }
+      const dfs=sectionData(sec);
+      for(const f of dfs) files.push({name:'data/'+f.name, u8:f.u8});
+      if(nf||dfs.length) sections[sec]={figures:nf, dataFiles:dfs.length};
+    }
+    [['single',lastResults.single],['explore',exploreState],
+     ['induct',inductState],['infer',infState]].forEach(([nm,d])=>{
+      if(d) files.push({name:'raw/'+nm+'.json', u8:strU8(JSON.stringify(d))});
+    });
+    const mj=JSON.stringify(buildManifest(sections),null,2);
+    if(backend&&((backend.token&&mj.includes(backend.token))||(backend.url&&mj.includes(backend.url))))
+      throw new Error('refusing export: backend credentials would leak into manifest');
+    files.unshift({name:'README.txt', u8:strU8(readmeText())});
+    files.unshift({name:'manifest.json', u8:strU8(mj)});
+    saveBlob(slug($('#body').value)+'_moonmelodies_report.zip', zipStore(files));
+  }catch(e){ console.error('report export failed:', e); }
+  finally{ btn.disabled=false; btn.classList.remove('running'); btn.textContent=old; syncExportButtons(); }
+}
+
+/* ---- wiring: one delegated listener for all section buttons ---- */
+document.addEventListener('click', e=>{
+  const b=e.target.closest('.exb');
+  if(b&&!b.disabled) exportSection(b.closest('.exbtns').dataset.sec, b.dataset.ex);
+});
+$('#exportAll').onclick=exportReport;
 
 /* boot: try to auto-reconnect to a previously used backend, else sample */
 (async function boot(){
