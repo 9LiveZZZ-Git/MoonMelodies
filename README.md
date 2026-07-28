@@ -89,7 +89,13 @@ RunPPfile('Europa', 'PPEuropa.py')
 
 Exact dependency pins are in [`pyproject.toml`](pyproject.toml). See the prerequisite links below for anything conda/pip can't resolve directly.
 
-> **What a fresh clone + install covers.** The steps above give a **complete engine and backend** — every model type (hydrosphere, interior, seismic, gravity/Love numbers, magnetic induction, ExploreOgram/InductOgram/MonteCarlo) runs, because the SPICE leap-second/PCK/frame kernels, Reaktoro databases, all `Default/PP<Body>.py` inputs, and the MgSO₄/NH₃ reference data are tracked in the repo, and `install` downloads the ~164 MB Perple_X EOS tables and seeds `UserConfigs/`. Two **optional** features need data that is *not* in the repo and must be fetched separately: SPICE **ephemeris kernels** (`.bsp`, large — only for spacecraft trajectory analysis; download from [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/) into `SPICE/`), and the **Bayesian-inference** structure caches + SBI model artifacts (see the spec's inference notes). Neither is required for standard modeling or the backend.
+> **What a fresh clone + install covers.** The steps above give a **complete engine and backend** — every model type (hydrosphere, interior, seismic, gravity/Love numbers, magnetic induction, ExploreOgram/InductOgram/MonteCarlo) runs, because the SPICE leap-second/PCK/frame kernels, Reaktoro databases, all `Default/PP<Body>.py` inputs, and the MgSO₄/NH₃ reference data are tracked in the repo, and `install` downloads the ~164 MB Perple_X EOS tables and seeds `UserConfigs/`. Two **optional** features need data that is *not* in the repo and must be fetched separately: SPICE **ephemeris kernels** (`.bsp`, large — only for spacecraft trajectory analysis; download from [NAIF](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/) into `SPICE/`), and the **Bayesian-inference** SBI posterior artifacts (the trained `.pt` flows, ~6.9 MB). Neither is required for standard modeling or the backend. Fetch the inference flows with:
+
+```bash
+python -m PlanetProfile.Inference.download_artifacts   # ~6.9 MB from the public HF Space
+```
+
+These are the upstream's validated 1M-simulation flows (from the [`vsteven/planetprofile`](https://huggingface.co/spaces/vsteven/planetprofile) Space) for **Europa and Titan** — the only bodies with trained posteriors. The `/infer` service serves whatever is present and skips the rest, so a partial fetch degrades gracefully.
 
 ### Running the tests
 

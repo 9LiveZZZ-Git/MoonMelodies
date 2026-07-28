@@ -98,6 +98,61 @@ _SLOTS = {
         'scope': 'Differentiated no-ocean Titan (Andrade rheology). All validation gates green '
                  'within domain.',
     },
+    'titan_freegrav': {
+        'file': 'titan_freegrav_noocean_posterior_1m.pt',
+        'config': 'titan_freegrav_noocean.json',
+        'body': 'Titan',
+        'label': 'Titan · free-gravity no-ocean (geodesy + tidal k2)',
+        'im_k2_cap': False, 'tb_floor': None,
+        'scope': 'No-ocean Titan conditioned on free (dC20/dC22) gravity plus the measured '
+                 'degree-2 tidal Love number (Re/Im k2). Titan-specific k2 domain, not Europa\'s.',
+    },
+    # Clipper v5 (v4 geodesy + ice-thickness reparam) deployed trio: full channels + two ablations.
+    'europa_clipper_v5_geodesy': {
+        'file': 'europa_clipper_v5_geodesy_11D_posterior_1m.pt',
+        'config': 'europa_clipper_v5_geodesy_11D.json',
+        'body': 'Europa',
+        'label': 'Europa · Clipper v5 geodesy (11D, ice-thickness reparam)',
+        'im_k2_cap': True, 'tb_floor': None,
+        'scope': 'v4 geodesy re-parameterized on ice-shell thickness; induction carries the '
+                 'ice-thickness↔salinity correlation. Guards inherited from v4.',
+    },
+    'europa_clipper_v5_noinduction': {
+        'file': 'europa_clipper_v5_noinduction_7obs_posterior_1m.pt',
+        'config': 'europa_clipper_v5_noinduction_7obs.json',
+        'body': 'Europa',
+        'label': 'Europa · Clipper v5 — no induction (7 obs, ablation)',
+        'im_k2_cap': True, 'tb_floor': None,
+        'scope': 'v5 with induction channels removed — isolates what magnetic induction '
+                 'contributes to the interior constraint (weaker D↔salinity correlation).',
+    },
+    'europa_clipper_v5_nok2': {
+        'file': 'europa_clipper_v5_nok2_17obs_posterior_1m.pt',
+        'config': 'europa_clipper_v5_nok2_17obs.json',
+        'body': 'Europa',
+        'label': 'Europa · Clipper v5 — no k2/h2 (17 obs, ablation)',
+        'im_k2_cap': True, 'tb_floor': None,       # cap auto-skips (no Im_k2 channel)
+        'scope': 'v5 with the tidal Love-number channels removed — the interior constrained by '
+                 'gravity + induction alone.',
+    },
+    'europa_clipper_v6_noinduction': {
+        'file': 'europa_clipper_v6_freegrav_noinduction_6obs_posterior_1m.pt',
+        'config': 'europa_clipper_v6_freegrav_noinduction_6obs.json',
+        'body': 'Europa',
+        'label': 'Europa · Clipper v6 free-gravity — no induction (6 obs, ablation)',
+        'im_k2_cap': True, 'tb_floor': None,
+        'scope': 'v6 free-gravity with induction removed. CMR2 dropped as an observable; '
+                 'interior from k2/h2 alone.',
+    },
+    'europa_clipper_v6_nok2': {
+        'file': 'europa_clipper_v6_freegrav_nok2_16obs_posterior_1m.pt',
+        'config': 'europa_clipper_v6_freegrav_nok2_16obs.json',
+        'body': 'Europa',
+        'label': 'Europa · Clipper v6 free-gravity — no k2/h2 (16 obs, ablation)',
+        'im_k2_cap': True, 'tb_floor': None,       # cap auto-skips (no Im_k2 channel)
+        'scope': 'v6 free-gravity with tidal channels removed — interior from gravity + '
+                 'induction alone.',
+    },
 }
 
 # Module cache of loaded SBIRunner objects (torch deserialize is paid once per slot).
