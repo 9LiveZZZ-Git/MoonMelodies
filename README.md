@@ -95,7 +95,7 @@ Exact dependency pins are in [`pyproject.toml`](pyproject.toml). See the prerequ
 python -m PlanetProfile.Inference.download_artifacts   # ~6.9 MB from the public HF Space
 ```
 
-These are the upstream's validated 1M-simulation flows (from the [`vsteven/planetprofile`](https://huggingface.co/spaces/vsteven/planetprofile) Space) for **Europa and Titan** — the only bodies with trained posteriors. The `/infer` service serves whatever is present and skips the rest, so a partial fetch degrades gracefully.
+These are the upstream's validated 1M-simulation flows (from the [`vsteven/planetprofile`](https://huggingface.co/spaces/vsteven/planetprofile) Space) for **Europa and Titan**. This fork additionally trains and commits SBI posteriors for **Enceladus, Ganymede, and Callisto** (locally trained with the in-repo pipeline — see [`PlanetProfile/Inference/TRAINING_MOONS.md`](PlanetProfile/Inference/TRAINING_MOONS.md) — since the Space has no flows for them), so `/infer` covers **five bodies**. The service serves whatever is present and skips the rest, so a partial fetch degrades gracefully.
 
 ### Running the tests
 

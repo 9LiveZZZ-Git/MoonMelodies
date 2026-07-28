@@ -98,6 +98,39 @@ _SLOTS = {
         'scope': 'Differentiated no-ocean Titan (Andrade rheology). All validation gates green '
                  'within domain.',
     },
+    'callisto_nacl': {
+        'file': 'callisto_nacl_andrade_8D_posterior.pt',
+        'config': 'callisto_nacl_andrade_8D.json',
+        'body': 'Callisto',
+        'label': 'Callisto · NaCl Andrade (8D — induction + k2/h2)',
+        'im_k2_cap': True, 'tb_floor': None,
+        'scope': 'Locally trained (725k-sim NSF flow) Callisto with a NaCl ocean and Andrade '
+                 'rheology, conditioned on CMR2, the degree-2 tidal Love numbers (k2/h2), and '
+                 'Galileo induction channels. SBC-calibrated on 7 of 8 parameters; the Tb '
+                 '(ice-base temperature) marginal is prior-dominated / weakly-identified under '
+                 'these observables (KS p ~0.01) — the same intrinsic behavior the deployed '
+                 'Europa-Clipper flows document. Treat Tb as diffuse, not a tight constraint.',
+    },
+    'ganymede_pureh2o': {
+        'file': 'ganymede_pureh2o_andrade_8D_posterior.pt',
+        'config': 'ganymede_pureh2o_andrade_8D.json',
+        'body': 'Ganymede',
+        'label': 'Ganymede · pureH₂O Andrade (8D — SBC calibrated)',
+        'im_k2_cap': True, 'tb_floor': None,
+        'scope': 'Locally trained (837k-sim NSF flow) Ganymede with a pure-water ocean and '
+                 'Andrade rheology, conditioned on CMR2 and the degree-2 tidal Love numbers '
+                 '(k2/h2). SBC-calibrated (all 8 params, min KS p 0.07).',
+    },
+    'enceladus_cassini': {
+        'file': 'enceladus_cassini_smoke_6D_posterior.pt',
+        'config': 'enceladus_cassini_smoke_6D.json',
+        'body': 'Enceladus',
+        'label': 'Enceladus · Cassini (6D — SBC calibrated)',
+        'im_k2_cap': False, 'tb_floor': None,
+        'scope': 'Locally trained (1M-sim NSF flow) no-core Enceladus, conditioned on the '
+                 'Cassini C20/C22 gravity coefficients and the physical libration amplitude. '
+                 'SBC-calibrated (all 6 params, min KS p 0.13).',
+    },
     'titan_freegrav': {
         'file': 'titan_freegrav_noocean_posterior_1m.pt',
         'config': 'titan_freegrav_noocean.json',
